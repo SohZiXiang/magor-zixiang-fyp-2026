@@ -184,6 +184,13 @@ This project extends the existing MAGOR platform and focuses on the following ar
         - Refined the default prompt to produce summaries more closely aligned with the YouTube Ask AI format (with timestamps and in concise bullet points)
 - Improved Space Utilization on the Recording Page
 
+### Weeks 31-32
+- Implemented Q&A tab question-and-answer functionality
+    - Added persisted storage and retrieval of previous Q&A for each recording
+    - Manual polling after automatic polling times out or user navigates away
+    - Contextual Q&A: Previous Q&A exchanges used as context when answering new questions     
+
+
 
 
 ## Weekly Video Updates
@@ -201,3 +208,4 @@ This project extends the existing MAGOR platform and focuses on the following ar
 - Weeks 24-25: [Click to view](https://www.youtube.com/watch?v=e-QcabR4aQI&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=11)
 - Weeks 26-28: [Click to view](https://www.youtube.com/watch?v=u9uMRD5rS-k&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=12)
 - Weeks 29-30: [Click to view](https://www.youtube.com/watch?v=dHhvd4fLUVY&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=13)
+- Weeks 31-32: [Click to view](https://www.youtube.com/watch?v=lPh--icOYUY&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=14)
