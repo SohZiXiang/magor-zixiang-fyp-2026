@@ -199,6 +199,11 @@ This project extends the existing MAGOR platform and focuses on the following ar
     - Fixed error handling for refresh ASR requests status
     - WIP: Added CRACO configuration for missing browser replacements
   
+### Weeks 35-36
+- Resolved XML dependency issues
+- Fixed transcript selection in “Show Options” panel
+- Implemented change transcript in transcript editor page
+- Upgraded Studio/Backend Node Version and resolved dependency issues
 
 
 
@@ -219,3 +224,4 @@ This project extends the existing MAGOR platform and focuses on the following ar
 - Weeks 29-30: [Click to view](https://www.youtube.com/watch?v=dHhvd4fLUVY&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=13)
 - Weeks 31-32: [Click to view](https://www.youtube.com/watch?v=lPh--icOYUY&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=14)
 - Weeks 33-34: [Click to view](https://www.youtube.com/watch?v=DaAqLRYu1JA&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=15)
+- Weeks 35-36: [Click to view](https://www.youtube.com/watch?v=YZo74fxNGms&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=16)
