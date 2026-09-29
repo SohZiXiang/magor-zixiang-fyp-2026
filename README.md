@@ -205,6 +205,13 @@ This project extends the existing MAGOR platform and focuses on the following ar
 - Implemented change transcript in transcript editor page
 - Upgraded Studio/Backend Node Version and resolved dependency issues
 
+### Week 37
+- Updated Summary requests to use taskType: GENERAL and queue: meadow9
+- Updated Q&A requests to use taskType: CHAT and queue: meadow9
+    - Pass previous Q&A through the dedicated chatHistory attribute instead of embedding it in the prompt
+
+
+
 
 
 ## Weekly Video Updates
@@ -225,3 +232,4 @@ This project extends the existing MAGOR platform and focuses on the following ar
 - Weeks 31-32: [Click to view](https://www.youtube.com/watch?v=lPh--icOYUY&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=14)
 - Weeks 33-34: [Click to view](https://www.youtube.com/watch?v=DaAqLRYu1JA&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=15)
 - Weeks 35-36: [Click to view](https://www.youtube.com/watch?v=YZo74fxNGms&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=16)
+- Week 37: [Click to view](https://www.youtube.com/watch?v=dGLslvaNhFA&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=17)
