@@ -75,6 +75,17 @@ This project extends the existing MAGOR platform and focuses on the following ar
 - **[Magor Frontend](https://github.com/ntuspeechlab/magor-frontend/tree/ZiXiang-2026)**
 
 
+## Final Report and Presentation
+
+| Item | Link |
+|---|---|
+| Final report (amended) | [Amended_FYP_Soh_Zi_Xiang_Final_Report.pdf](./Reports/Amended_FYP_Soh_Zi_Xiang_Final_Report.pdf) |
+| Presentation video | [Watch on YouTube](https://www.youtube.com/watch?v=iQ0LxNeolx8) |
+| Presentation slides (PDF) | [FYP_Soh_Zi_Xiang_Presentation.pdf](./Presentation/FYP_Soh_Zi_Xiang_Presentation.pdf) |
+| Animated walkthroughs (HTML) | [Presentation/animations](./Presentation/animations) (download and open in a browser) |
+| How I used Claude to create the animations | [HOW_I_USED_CLAUDE.md](./Presentation/HOW_I_USED_CLAUDE.md) |
+
+
 ## Progress Updates (Ongoing Development)
 
 ### Week 3

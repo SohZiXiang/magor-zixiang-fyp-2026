@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The life of a recording, and where it broke</title>
+<style>
+:root{
+  --bg:#F5F7FA; --panel:#FFFFFF; --ink:#202124; --navy:#0B1F3A; --muted:#5F6368; --wire:#9AA0A6;
+  --line:#DADCE0; --pale:#F1F3F4; --soft:#F8F9FA;
+  --blue:#1967D2; --blue-m:#4285F4; --blue-bg:#E8F0FE; --blue-line:#AECBFA;
+  --red:#D93025; --red-bg:#FCE8E6; --green:#188038; --green-bg:#E6F4EA;
+  --amber:#B06000; --amber-bg:#FEF7E0; --dark:#3C4043;
+  --f:'Segoe UI',system-ui,-apple-system,sans-serif; --fs:'Segoe UI Semibold','Segoe UI',system-ui,sans-serif;
+  --mono:Consolas,'Cascadia Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
+body{font-family:var(--f);color:var(--ink)}
+
+/* live page: a 1920x1080 stage scaled to the window */
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center;
+  padding:30px 28px 22px;display:grid;grid-template-rows:auto 870px auto;gap:18px;align-content:center;background:var(--bg)}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:0 4px}
+.eyebrow{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:700;letter-spacing:.09em;color:var(--blue);text-transform:uppercase}
+.mark{display:inline-flex;align-items:center;gap:4px;height:20px}
+.mark i{display:block;width:4px;border-radius:2px;background:var(--blue-m)}
+h1{margin:6px 0 0;font:56px/1.1 var(--fs);color:var(--navy);letter-spacing:-.005em}
+.ctrl{display:flex;gap:10px;align-items:center;padding-bottom:6px}
+.kbd{font-size:17px;color:var(--muted);margin-right:8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;height:46px;padding:0 20px;font:inherit;font-size:18px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.go{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn:focus-visible,.step:focus-visible{outline:3px solid var(--blue);outline-offset:1px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 500px;gap:20px;min-height:0}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;min-width:0;display:flex}
+#flow{display:block;width:100%;height:100%}
+.steps{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px 14px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
+.steps-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 10px}
+.cap{font-size:17px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+#count{font:600 17px var(--mono);color:var(--blue)}
+#steplist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;flex:1;min-height:0}
+.grp-h{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--wire);padding:9px 12px 1px}
+.step{appearance:none;width:100%;text-align:left;font:inherit;color:var(--ink);background:none;border:1.5px solid transparent;border-radius:12px;
+  padding:6px 12px;cursor:pointer;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:4px;position:relative;overflow:hidden}
+.step .n{grid-row:1/3;font:20px var(--mono);color:var(--wire);padding-top:4px}
+.step .t{font:25px/1.3 var(--fs);color:var(--muted)}
+.step .d{display:none;font-size:23.5px;line-height:1.36;color:var(--ink);padding:3px 0 4px}
+.step:hover{background:var(--soft)}
+.step.done .n{color:var(--blue)}
+.step.done .t{color:var(--ink)}
+.step.on{background:var(--blue-bg);border-color:var(--blue-m)}
+.step.on .t{color:var(--navy)}
+.step.on .n{color:var(--blue)}
+.step.on .d{display:block}
+.step .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;background:var(--blue-m);transform-origin:left;transform:scaleX(0)}
+footer{display:flex;gap:28px;font-size:17px;color:var(--muted);padding:0 4px}
+footer .lg{display:inline-flex;align-items:center;gap:8px}
+footer .lg i{display:inline-block;width:22px;height:15px;border-radius:4px}
+
+/* record mode: just the 1864x800 board + steps, laid on a white slide */
+.record,.record body{background:#fff}
+.record .stage{left:0;top:0;transform:none!important;width:1864px;height:800px;padding:0;display:block;background:#fff}
+.record header,.record footer,.record .grp-h{display:none}
+.record .main{height:800px}
+
+/* svg */
+.card{fill:var(--panel);stroke:var(--line);stroke-width:1.6}
+.card-soft{fill:var(--soft);stroke:var(--line);stroke-width:1.4}
+.card-blue{fill:var(--blue-bg);stroke:var(--blue-m);stroke-width:2}
+.card-red{fill:var(--red-bg);stroke:var(--red);stroke-width:2}
+.card-green{fill:var(--green-bg);stroke:var(--green);stroke-width:2}
+.card-amber{fill:var(--amber-bg);stroke:var(--amber);stroke-width:2;stroke-dasharray:8 6}
+.card-ext{fill:var(--soft);stroke:var(--wire);stroke-width:1.8;stroke-dasharray:8 6}
+.chip{fill:var(--pale);stroke:none}
+.chip-blue{fill:var(--blue-bg)} .chip-red{fill:var(--red-bg)} .chip-green{fill:var(--green-bg)} .chip-amber{fill:var(--amber-bg)}
+.chip-wr{fill:#fff;stroke:var(--red);stroke-width:1.6} .chip-wg{fill:#fff;stroke:var(--green);stroke-width:1.6}
+.chip-solid-blue{fill:var(--blue-m)} .chip-solid-red{fill:var(--red)} .chip-solid-green{fill:var(--green)} .chip-solid-navy{fill:var(--navy)}
+.wire{fill:none;stroke:var(--wire);stroke-width:2.6}
+.w-blue{fill:none;stroke:var(--blue);stroke-width:2.8} .w-red{fill:none;stroke:var(--red);stroke-width:2.8}
+.w-green{fill:none;stroke:var(--green);stroke-width:2.8} .w-amber{fill:none;stroke:var(--amber);stroke-width:2.8}
+.w-navy{fill:none;stroke:var(--navy);stroke-width:2.8}
+.ghostline{opacity:.14}
+.dash{stroke-dasharray:8 7}
+.glow{fill:none;stroke:var(--blue-m);stroke-width:3.2}
+.ic *{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.t-title{font:27px var(--fs);fill:var(--navy)}
+.t-head{font:31px var(--fs);fill:var(--navy)}
+.t-sub{font:21.5px var(--f);fill:var(--muted)}
+.t-body{font:22px var(--f);fill:var(--ink)}
+.t-prob{font:21px var(--fs);fill:var(--red)}
+.t-ok{font:21px var(--fs);fill:var(--green)}
+.t-amb{font:21px var(--fs);fill:var(--amber)}
+.t-blue{font:21px var(--fs);fill:var(--blue)}
+.t-mono{font:21px var(--mono);fill:var(--ink)}
+.t-mono-s{font:19.5px var(--mono);fill:var(--ink)}
+.t-chip{font:19.5px var(--fs);fill:var(--ink)}
+.t-cap{font:700 18.5px var(--f);letter-spacing:.08em;fill:var(--muted)}
+.t-white{fill:#fff}
+.ptr{fill:var(--navy);stroke:#fff;stroke-width:1.8;stroke-linejoin:round}
+.clickring{fill:none;stroke:var(--blue-m);stroke-width:3.5}
+.dot{fill:var(--blue-m)}
+
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <header>
+    <div>
+      <div class="eyebrow"><span class="mark"><i style="height:9px"></i><i style="height:18px"></i><i style="height:12px"></i><i style="height:20px"></i><i style="height:10px"></i></span>01   Introducing MAGOR</div>
+      <h1>The life of a recording, and where it broke</h1>
+    </div>
+    <div class="ctrl">
+      <span class="kbd">&larr; &rarr; step &middot; Space replay</span>
+      <button class="btn" id="prev">Back</button>
+      <button class="btn" id="again">Replay</button>
+      <button class="btn" id="next">Next</button>
+      <button class="btn go" id="all">Play all</button>
+    </div>
+  </header>
+  <div class="main">
+    <div class="board"><svg id="flow" viewBox="0 0 1200 714" role="img" aria-label="Walkthrough of one recording through MAGOR, from upload to deletion, marking which stages worked and which were broken."></svg></div>
+    <aside class="steps" aria-label="Steps">
+      <div class="steps-head"><span class="cap">Steps</span><span id="count"></span></div>
+      <ol id="steplist"></ol>
+    </aside>
+  </div>
+  <footer><span>Soh Zi Xiang &middot; CCDS25-1034 &middot; MAGOR</span><span class="lg"><i style="background:var(--green-bg);border:2px solid var(--green)"></i>works</span><span class="lg"><i style="background:var(--red-bg);border:2px solid var(--red)"></i>broken</span><span class="lg"><i style="background:var(--amber-bg);border:2px solid var(--amber)"></i>not built yet</span><span style="margin-left:auto">Source: FYP report, Section 1.2 and Chapter 4</span></footer>
+</div>
+<script>
+const ICONS={"audio-lines": "<path d=\"M2 10v3\" /> <path d=\"M6 6v11\" /> <path d=\"M10 3v18\" /> <path d=\"M14 8v7\" /> <path d=\"M18 5v13\" /> <path d=\"M22 10v3\" />", "captions": "<rect width=\"18\" height=\"14\" x=\"3\" y=\"5\" rx=\"2\" ry=\"2\" /> <path d=\"M7 15h4M15 15h2M7 11h2M13 11h4\" />", "circle": "<circle cx=\"12\" cy=\"12\" r=\"10\" />", "circle-check": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m16 9-5.5 5.5L8 12\" />", "circle-dashed": "<path d=\"M10.1 2.182a10 10 0 0 1 3.8 0\" /> <path d=\"M13.9 21.818a10 10 0 0 1-3.8 0\" /> <path d=\"M17.609 3.721a10 10 0 0 1 2.69 2.7\" /> <path d=\"M2.182 13.9a10 10 0 0 1 0-3.8\" /> <path d=\"M20.279 17.609a10 10 0 0 1-2.7 2.69\" /> <path d=\"M21.818 10.1a10 10 0 0 1 0 3.8\" /> <path d=\"M3.721 6.391a10 10 0 0 1 2.7-2.69\" /> <path d=\"M6.391 20.279a10 10 0 0 1-2.69-2.7\" />", "circle-x": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m15 9-6 6\" /> <path d=\"m9 9 6 6\" />", "database": "<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" />", "dot": "<circle cx=\"12\" cy=\"12\" r=\"1\" />", "download": "<path d=\"M12 15V3\" /> <path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /> <path d=\"m7 10 5 5 5-5\" />", "file": "<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /> <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" />", "file-video": "<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /> <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /> <path d=\"M15.033 13.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56v-4.704a.645.645 0 0 1 .967-.56z\" />", "layout-dashboard": "<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /> <rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />", "package": "<path d=\"M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z\" /> <path d=\"M12 22V12\" /> <polyline points=\"3.29 7 12 12 20.71 7\" /> <path d=\"m7.5 4.27 9 5.15\" />", "sparkles": "<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />", "trash-2": "<path d=\"M10 11v6\" /> <path d=\"M14 11v6\" /> <path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /> <path d=\"M3 6h18\" /> <path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />", "triangle-alert": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /> <path d=\"M12 9v4\" /> <path d=\"M12 17h.01\" />", "upload": "<path d=\"M12 3v12\" /> <path d=\"m17 8-5-5-5 5\" /> <path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />"};
+/* ---------- shared animation engine (deterministic: every frame is a pure function of T) ---------- */
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('flow');
+const RECORD=/[?&]record\b/.test(location.search);
+if(RECORD)document.documentElement.classList.add('record');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let AMB=0, cur=-1, T=0;
+
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in (attrs||{}))e.setAttribute(k,attrs[k]);(parent||svg).appendChild(e);return e}
+function grp(parent){return el('g',{},parent)}
+function txt(x,y,s,cls,parent,anchor){const t=el('text',{x,y,class:cls||'t-sub','text-anchor':anchor||'start'},parent);t.textContent=s;return t}
+function box(x,y,w,h,cls,parent,rx){return el('rect',{x,y,width:w,height:h,rx:rx==null?12:rx,class:cls},parent)}
+function icon(name,x,y,size,color,parent){
+  const g=el('g',{transform:`translate(${x} ${y}) scale(${size/24})`,class:'ic'},parent);
+  g.style.color=color||'var(--ink)';g.innerHTML=ICONS[name]||'';return g}
+function iconDisc(name,cx,cy,r,color,bg,parent){
+  const g=grp(parent);el('circle',{cx,cy,r,style:`fill:${bg}`},g);
+  icon(name,cx-r*.58,cy-r*.58,r*1.16,color,g);return g}
+
+/* a rounded pill sized to its measured label; returns {g,r,t,w} */
+function pill(parent,x,y,h,label,rc,tc,o){o=o||{};const g=grp(parent);const r=box(x,y,10,h,rc,g,o.rx==null?h/2:o.rx);
+  const pad=o.pad==null?16:o.pad,ic=o.icon?h*.62:0,gap=o.icon?8:0;
+  if(o.icon)icon(o.icon,x+pad-2,y+(h-ic)/2,ic,o.icol||'var(--muted)',g);
+  const t=txt(x+pad+ic+gap,y+h/2+(o.dy==null?7:o.dy),label,tc,g);if(o.fill)t.style.fill=o.fill;
+  const w=Math.ceil(pad+ic+gap+t.getComputedTextLength()+pad);r.setAttribute('width',w);return {g,r,t,w}}
+/* lay pills (made at x=0) out in a row ending at xr */
+function rowRight(items,xr,gap){let x=xr;for(let i=items.length-1;i>=0;i--){x-=items[i].w;items[i].g.setAttribute('transform',`translate(${x} 0)`);items[i].x=x;x-=gap}}
+
+/* timeline */
+const tweens=[];
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const eio=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+const lin=p=>p;
+const back=p=>{const c1=1.70158,c3=c1+1;return p<=0?0:1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const lerp=(a,b,p)=>a+(b-a)*p;
+function tw(t0,d,fn,o){o=o||{};tweens.push({t0,d,fn,mod:!!o.mod,ease:o.ease||eio})}
+function render(t){for(const w of tweens){if(w.mod&&t<w.t0)continue;const p=clamp((t-w.t0)/w.d);w.fn(w.ease(p),t,p)}}
+function always(fn){tw(0,1e9,(p,t)=>fn(t),{ease:lin})}
+const op=(e,v)=>{e.style.opacity=v};
+const G=.12;
+const ghostIn=(e,t0,d)=>tw(t0,d||.5,p=>op(e,G+(1-G)*p));
+const fadeIn=(e,t0,d)=>tw(t0,d||.4,p=>op(e,p));
+const fadeOut=(e,t0,d,to)=>tw(t0,d||.4,p=>op(e,lerp(1,to||0,p)),{mod:true});
+function pop(e,cx,cy,t0,d,from){from=from==null?G:from;
+  tw(t0,d||.55,(p,t,raw)=>{const s=raw<=0?1:lerp(.62,1,p);
+    e.setAttribute('transform',`translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})`);
+    op(e,raw<=0?from:from+(1-from)*clamp(raw*2.2))},{ease:back})}
+function moveTo(e,t0,d,x0,y0,x1,y1){tw(t0,d,(p)=>e.setAttribute('transform',`translate(${lerp(x0,x1,p)} ${lerp(y0,y1,p)})`))}
+function swapText(e,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.textContent!==v)e.textContent=v})}
+function swapAttr(e,attr,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.getAttribute(attr)!==v)e.setAttribute(attr,v)})}
+
+/* arrows: a faint ghost of the route, then the real stroke draws on */
+const MARK={wire:'ah','w-blue':'ah-b','w-red':'ah-r','w-green':'ah-g','w-amber':'ah-a','w-navy':'ah-n'};
+function arrow(d,t0,dur,parent,cls,opts){opts=opts||{};cls=cls||'wire';
+  const m=`url(#${MARK[cls]||'ah'})`;
+  const base=el('path',{d,class:cls+' ghostline','marker-end':opts.nohead?'':m},parent);
+  if(opts.noghost)op(base,0);
+  const p=el('path',{d,class:cls,pathLength:1,'stroke-dasharray':'1 1'},parent);
+  tw(t0,dur||.5,q=>{p.style.strokeDashoffset=1-q;op(p,q>0?1:0);
+    if(q>.97&&!opts.nohead)p.setAttribute('marker-end',m);else p.removeAttribute('marker-end')});
+  return p}
+function packet(path,shape,t0,d,rev){const L=path.getTotalLength();op(shape,0);
+  tw(t0,d||.9,(p,t,raw)=>{if(raw<=0||raw>=1){op(shape,0);return}
+    const q=rev?1-p:p;const pt=path.getPointAtLength(q*L);op(shape,1);
+    shape.setAttribute('transform',`translate(${pt.x} ${pt.y})`)})}
+function hiddenPath(d){const p=el('path',{d,fill:'none',stroke:'none'});return p}
+/* outline on the box that is the focus of the current step: pulses live, holds steady in a recording
+   (each recorded step ends on a frozen frame, so a pulse would freeze mid-ring) */
+function glowStep(b,idx,color,rx){
+  const g=el('rect',{x:b.x,y:b.y,width:b.w,height:b.h,rx:rx||16,class:'glow'});if(color)g.style.stroke=color;op(g,0);
+  always(t=>{if(cur!==idx){op(g,0);return}
+    if(RECORD){const k=0;   /* on the card's own outline, so it reads as one thicker border */
+      g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);
+      op(g,.9*clamp((t-PH[idx][0])/.35));return}
+    const ph=(AMB%1.4)/1.4,k=ph*9;
+    g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);op(g,.6*(1-ph))});
+  return g}
+/* mouse pointer used to show clicks */
+function pointer(parent){const g=grp(parent);
+  el('path',{d:'M0 0L0 22L6 17L10 26L14 24L10 15L18 15Z',class:'ptr'},g);op(g,0);return g}
+function clickPulse(cx,cy,t0,parent){const c=el('circle',{cx,cy,r:4,class:'clickring'},parent);op(c,0);
+  tw(t0,.55,(p,t,raw)=>{if(raw<=0||raw>=1){op(c,0);return}c.setAttribute('r',4+22*p);op(c,.8*(1-p))},{ease:lin})}
+
+/* defs: arrowheads in each wire colour */
+const defs=el('defs');
+[['ah','var(--wire)'],['ah-b','var(--blue)'],['ah-r','var(--red)'],['ah-g','var(--green)'],['ah-a','var(--amber)'],['ah-n','var(--navy)']].forEach(([id,c])=>{
+  const mk=el('marker',{id,viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);
+  el('path',{d:'M0 0L10 5L0 10z',style:`fill:${c}`},mk)});
+
+/* Scene A: the life of one recording, and where it broke (viewBox 1200 x 714) */
+const END=30;
+const CW=360, CH=222;
+const POS={up:[20,100],asr:[420,100],rev:[820,100],exp:[820,384],ai:[420,384],del:[20,384]};
+
+function card(key,ic,title,sub,t0,o){o=o||{};
+  const [x,y]=POS[key];const g=grp();
+  const r=box(x,y,CW,CH,'card',g,18);
+  iconDisc(ic,x+48,y+48,28,o.icol||'var(--blue)',o.ibg||'var(--blue-bg)',g);
+  txt(x+90,y+58,title,'t-title',g);
+  txt(x+22,y+104,sub,'t-sub',g);
+  pop(g,x+CW/2,y+CH/2,t0,.55);
+  return {g,r,x,y}}
+/* verdict lines at the foot of a card */
+function verdict(c,lines,t0,kind){
+  const IC={ok:['circle-check','var(--green)','t-ok'],bad:['circle-x','var(--red)','t-prob'],amb:['circle-dashed','var(--amber)','t-amb']}[kind];
+  lines.forEach((s,i)=>{const g=grp(c.g);
+    icon(IC[0],c.x+20,c.y+164+i*29,23,IC[1],g);txt(c.x+52,c.y+183+i*29,s,IC[2],g);fadeIn(g,t0+i*.3,.35)})}
+function turn(c,t,cls){swapAttr(c.r,'class',[[0,'card'],[t,cls]])}
+
+/* ---- bands that run under every stage ---- */
+function band(y,ic,cap,sub){const g=grp();const r=box(20,y,1160,72,'card',g,16);
+  iconDisc(ic,58,y+36,25,'var(--blue)','var(--blue-bg)',g);
+  txt(96,y+29,cap,'t-cap',g);const s=txt(96,y+58,sub,'t-sub',g);op(g,G);return {g,r,s}}
+function bandChips(b,y,labels){const items=labels.map(s=>pill(b.g,0,y+18,36,s,'chip','t-chip',{fill:'var(--muted)'}));
+  rowRight(items,1164,10);return items}
+function redden(items,t0){items.forEach((p,i)=>tw(t0+i*.25,.3,q=>{p.r.setAttribute('class',q>.5?'chip-wr':'chip');p.t.style.fill=q>.5?'var(--red)':'var(--muted)'}))}
+
+const admin=band(10,'layout-dashboard','ADMIN PANEL','manages users, recordings and ASR jobs');
+const apChips=bandChips(admin,10,['Users','Recordings','ASR Requests','Statistics']);
+const rt=band(624,'package','RUNTIME','Node.js under all three services');
+const rtChips=bandChips(rt,624,['Frontend · Node 16','Backend · Node 18','Studio · Node 18']);
+
+/* ---- the journey: arrows draw on, with a packet riding each. After review, export, AI and delete
+   are optional and in no fixed order, so their cards just pop in ---- */
+[['M380 211L420 211',4.0],['M780 211L820 211',7.5]]
+  .forEach(([d,t])=>{const p=arrow(d,t,.45,null,'w-blue');packet(p,el('circle',{r:7,class:'dot'}),t,.45)});
+
+/* 1 upload */
+const c1=card('up','upload','Upload','audio or video, into Studio',1.5);
+{const g=grp(c1.g);const f=pill(g,0,0,38,'lecture.mp4','chip-blue','t-mono-s',{icon:'file-video',icol:'var(--blue)',pad:12,dy:6});
+  tw(2.0,.7,p=>{f.g.setAttribute('transform',`translate(${lerp(c1.x+8,c1.x+22,p)} ${c1.y+118})`);op(f.g,p)});
+  arrow(`M${c1.x+22+f.w+8} ${c1.y+137}L${c1.x+22+f.w+46} ${c1.y+137}`,2.6,.35,g,'w-blue');
+  const s=pill(g,c1.x+22+f.w+52,c1.y+118,38,'Studio','chip-solid-blue','t-chip',{fill:'#fff',pad:14});fadeIn(s.g,2.85,.3)}
+verdict(c1,['Works'],3.1,'ok');
+glowStep({x:c1.x,y:c1.y,w:CW,h:CH},1);
+
+/* 2 transcribe */
+const c2=card('asr','audio-lines','Transcribe','by the SpeechLab ASR service',4.4);
+{const g=grp(c2.g);const bars=grp(g);
+  for(let i=0;i<20;i++){const v=.25+Math.abs(Math.sin(i*.9)*Math.cos(i*.31))*.75,h=v*32;
+    el('rect',{x:c2.x+22+i*6.4,y:c2.y+137-h/2,width:3.6,height:h,rx:1.8,style:'fill:var(--blue-m)'},bars)}
+  ghostIn(bars,4.9,.4);
+  arrow(`M${c2.x+158} ${c2.y+137}L${c2.x+198} ${c2.y+137}`,5.3,.3,g,'w-blue');
+  [134,104,120].forEach((w,i)=>{const r=el('rect',{x:c2.x+208,y:c2.y+124+i*11,width:0,height:6,rx:3,style:'fill:var(--muted);opacity:.55'},g);
+    tw(5.5+i*.25,.4,p=>r.setAttribute('width',w*p))})}
+verdict(c2,['Works'],6.3,'ok');
+glowStep({x:c2.x,y:c2.y,w:CW,h:CH},2);
+
+/* 3 review: the current caption swells to three sentences */
+const c3=card('rev','captions','Review and edit','watch, then edit if needed',7.9);
+{const g=grp(c3.g);const X=c3.x+80;
+  el('rect',{x:X,y:c3.y+116,width:200,height:6,rx:3,style:'fill:var(--wire);opacity:.55'},g);
+  const cr=el('rect',{x:X-10,y:c3.y+126,width:220,height:10,rx:4,style:'stroke-width:1.6'},g);
+  const ln=[0,1,2].map(i=>el('rect',{x:X,y:c3.y+129+i*8,width:i?170:200,height:4,rx:2},g));
+  const nx=el('rect',{x:X,y:c3.y+140,width:180,height:6,rx:3,style:'fill:var(--wire);opacity:.55'},g);
+  tw(8.6,1.0,p=>{const bad=p>.5;cr.setAttribute('height',10+18*p);nx.setAttribute('y',c3.y+140+18*p);
+    cr.style.fill=bad?'var(--red-bg)':'var(--blue-bg)';cr.style.stroke=bad?'var(--red)':'var(--blue-m)';
+    ln.forEach((l,i)=>{op(l,i===0?1:clamp(p*2-i*.5));l.style.fill=bad?'var(--red)':'var(--blue)'})})}
+turn(c3,9.6,'card-red');
+verdict(c3,['Captions out of sync','Transcript hard to read'],9.6,'bad');
+glowStep({x:c3.x,y:c3.y,w:CW,h:CH},3,'var(--red)');
+
+/* 4 export */
+const c4=card('exp','download','Export','transcripts and recordings',11.4);
+{const g=grp(c4.g);let x=c4.x+22;const y=c4.y+118;
+  const a=pill(g,x,y,36,'XML','chip-blue','t-chip',{fill:'var(--blue)'});fadeIn(a.g,11.9,.3);x+=a.w+10;
+  const b=pill(g,x,y,36,'other formats','chip','t-chip',{fill:'var(--wire)'});
+  el('line',{x1:x+8,y1:y+18,x2:x+b.w-8,y2:y+18,style:'stroke:var(--red);stroke-width:2.4'},b.g);fadeIn(b.g,12.15,.3);x+=b.w+10;
+  const m=grp(g);box(x,y,52,36,'chip',m,18);icon('file-video',x+14,y+6,24,'var(--wire)',m);
+  el('line',{x1:x+8,y1:y+18,x2:x+44,y2:y+18,style:'stroke:var(--red);stroke-width:2.4'},m);fadeIn(m,12.4,.3)}
+turn(c4,12.7,'card-red');
+verdict(c4,['Raw XML only','No media download'],12.7,'bad');
+glowStep({x:c4.x,y:c4.y,w:CW,h:CH},4,'var(--red)');
+
+/* 5 work with it: did not exist yet */
+const c5=card('ai','sparkles','Work with it','summarize it, ask about it',14.9,{icol:'var(--amber)',ibg:'var(--amber-bg)'});
+{const g=grp(c5.g);let x=c5.x+22;['summary?','questions?'].forEach((s,i)=>{const q=pill(g,x,c5.y+118,36,s,'card-amber','t-amb',{});x+=q.w+12;fadeIn(q.g,15.4+i*.2,.3)})}
+turn(c5,15.4,'card-amber');
+verdict(c5,['Not built yet','The opportunity for AI'],15.9,'amb');
+glowStep({x:c5.x,y:c5.y,w:CW,h:CH},5,'var(--amber)');
+
+/* 6 delete: one record goes, everything else stays */
+const c6=card('del','trash-2','Delete','remove the recording',17.9);
+{const g=grp(c6.g);const sq=[];
+  for(let i=0;i<7;i++){const x=c6.x+22+i*46;sq.push(el('rect',{x,y:c6.y+118,width:38,height:36,rx:7,style:'fill:var(--pale);stroke:var(--line);stroke-width:1.4'},g));
+    icon(i===0?'database':'file',x+9,c6.y+126,20,'var(--muted)',g)}
+  const k=el('line',{x1:c6.x+20,y1:c6.y+136,x2:c6.x+20,y2:c6.y+136,style:'stroke:var(--dark);stroke-width:2.6'},g);
+  tw(18.5,.35,p=>{k.setAttribute('x2',c6.x+20+42*p);op(sq[0],1-.6*p)});
+  sq.slice(1).forEach((r,i)=>tw(18.9+i*.12,.3,p=>{const on=p>.5;r.style.fill=on?'var(--red-bg)':'var(--pale)';r.style.stroke=on?'var(--red)':'var(--line)'}))}
+turn(c6,19.4,'card-red');
+verdict(c6,['One record removed','Files left behind'],19.4,'bad');
+glowStep({x:c6.x,y:c6.y,w:CW,h:CH},6,'var(--red)');
+
+/* 7 the admin panel */
+ghostIn(admin.g,21.0,.4);
+swapAttr(admin.r,'class',[[0,'card'],[21.4,'card-red']]);
+redden(apChips,21.5);
+glowStep({x:20,y:10,w:1160,h:72},7,'var(--red)');
+
+/* 8 the runtime */
+ghostIn(rt.g,24.0,.4);
+swapAttr(rt.r,'class',[[0,'card'],[24.4,'card-red']]);
+swapText(rt.s,[[0,'Node.js under all three services'],[24.4,'end of life: no security patches']]);
+redden(rtChips,24.5);
+glowStep({x:20,y:624,w:1160,h:72},8,'var(--red)');
+
+/* 9 the picture: a slim conclusion in the gap between the rows, the whole diagram stays in view */
+const ban=grp();box(290,332,620,42,'card-red',ban,21);
+const bt=txt(0,361,'Problems at every stage after transcription','t-title',ban);
+bt.style.fill='var(--red)';bt.style.fontSize='23px';
+{const w=bt.getComputedTextLength(),x0=600-(w+34)/2;icon('triangle-alert',x0,341,24,'var(--red)',ban);bt.setAttribute('x',x0+34)}
+pop(ban,600,353,27.0,.5,0);
+
+const PH=[
+  [0,'One recording’s life','in','Follow one recording through MAGOR, from upload to deletion.'],
+  [1.5,'Upload','life','Audio or video is uploaded into MAGOR Studio. This worked.'],
+  [4.0,'Transcribe','life','Studio sends it to the SpeechLab ASR service. This worked too.'],
+  [7.5,'Review and edit','life','Captions did not keep in step with playback, and the page layout left little room for the transcript.'],
+  [11.0,'Export','life','Transcripts came out only as raw XML, and your own recording couldn’t be downloaded.'],
+  [14.5,'Work with it','life','No way to summarize or question a transcript. This is where AI comes in.'],
+  [17.5,'Delete','life','Deleting removed one record and left the recording’s files and records behind.'],
+  [21.0,'Administer','under','All four Admin Panel pages had issues that kept them from working properly.'],
+  [24.0,'Runtime','under','Every service ran an end-of-life Node.js release, with no more security patches.'],
+  [27.0,'The picture','sum','Problems at every stage after transcription.']
+];
+const GRP={in:'Start',life:'A recording’s life',under:'Under every stage',sum:'So'};
+
+/* ---------- step player: one step at a time, earlier steps resolve instantly ---------- */
+const list=document.getElementById('steplist');
+let html='',lastG='';
+PH.forEach(([t,title,g,d],i)=>{if(g!==lastG){html+=`<li class="grp-h ${g}">${GRP[g]}</li>`;lastG=g}
+  html+=`<li><button class="step" data-i="${i}"><span class="n">${String(i+1).padStart(2,'0')}</span><span class="t">${title}</span><span class="d">${d}</span><span class="bar"></span></button></li>`});
+list.innerHTML=html;
+const stepEls=[...list.querySelectorAll('.step')];
+const countEl=document.getElementById('count');
+const endOf=i=>i<PH.length-1?PH[i+1][0]:END;
+let playing=false,stopAt=0,all=false,last=0;
+function update(){
+  stepEls.forEach((b,i)=>{
+    b.classList.toggle('on',i===cur);b.classList.toggle('done',i<cur);
+    b.setAttribute('aria-current',i===cur?'step':'false');
+    const prog=i===cur?clamp((T-PH[i][0])/(endOf(i)-PH[i][0])):i<cur?1:0;
+    b.querySelector('.bar').style.transform=`scaleX(${i===cur?prog:0})`;
+  });
+  if(countEl)countEl.textContent=`${String(Math.max(cur,0)+1).padStart(2,'0')} / ${String(PH.length).padStart(2,'0')}`;
+  const pv=document.getElementById('prev'),nx=document.getElementById('next');
+  if(pv)pv.disabled=cur<=0; if(nx)nx.disabled=cur>=PH.length-1;
+}
+function select(i){cur=clamp(i,0,PH.length-1);all=false;T=PH[cur][0];stopAt=endOf(cur);playing=true;
+  if(reduce){T=stopAt;playing=false}update()}
+function frame(now){
+  const dt=last?Math.min(.25,(now-last)/1000):0;last=now;AMB+=dt;
+  if(playing){T+=dt;
+    if(all){let k=0;PH.forEach(([t],i)=>{if(T>=t)k=i});cur=k}
+    if(T>=stopAt){T=stopAt;playing=false}
+    update()}
+  render(T);requestAnimationFrame(frame)}
+stepEls.forEach(b=>b.onclick=()=>select(+b.dataset.i));
+document.getElementById('prev').onclick=()=>select(cur-1);
+document.getElementById('next').onclick=()=>select(cur+1);
+document.getElementById('again').onclick=()=>select(Math.max(cur,0));
+document.getElementById('all').onclick=()=>{cur=0;T=0;stopAt=END;all=true;playing=true;
+  if(reduce){T=END;cur=PH.length-1;playing=false}update()};
+document.addEventListener('keydown',e=>{
+  if(e.altKey||e.ctrlKey||e.metaKey)return;
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();select(cur+1)}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();select(cur-1)}
+  else if(e.key===' '&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();select(Math.max(cur,0))}
+  else if(e.key==='Home'){e.preventDefault();select(0)}
+});
+/* hooks for the frame-by-frame recorder */
+window.__meta=()=>({steps:PH.map(p=>p[0]),end:END});
+window.__frame=(t,amb,c)=>{T=t;AMB=amb;cur=c;playing=false;update();render(T)};
+/* fit the 1920x1080 stage to any window */
+const stage=document.getElementById('stage');
+function fit(){if(RECORD)return;const s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`translate(-50%,-50%) scale(${s})`}
+addEventListener('resize',fit);fit();
+cur=0;update();render(T);
+if(!RECORD)requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ask AI, end to end</title>
+<style>
+:root{
+  --bg:#F5F7FA; --panel:#FFFFFF; --ink:#202124; --navy:#0B1F3A; --muted:#5F6368; --wire:#9AA0A6;
+  --line:#DADCE0; --pale:#F1F3F4; --soft:#F8F9FA;
+  --blue:#1967D2; --blue-m:#4285F4; --blue-bg:#E8F0FE; --blue-line:#AECBFA;
+  --red:#D93025; --red-bg:#FCE8E6; --green:#188038; --green-bg:#E6F4EA;
+  --amber:#B06000; --amber-bg:#FEF7E0; --dark:#3C4043;
+  --f:'Segoe UI',system-ui,-apple-system,sans-serif; --fs:'Segoe UI Semibold','Segoe UI',system-ui,sans-serif;
+  --mono:Consolas,'Cascadia Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
+body{font-family:var(--f);color:var(--ink)}
+
+/* live page: a 1920x1080 stage scaled to the window */
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center;
+  padding:30px 28px 22px;display:grid;grid-template-rows:auto 870px auto;gap:18px;align-content:center;background:var(--bg)}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:0 4px}
+.eyebrow{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:700;letter-spacing:.09em;color:var(--blue);text-transform:uppercase}
+.mark{display:inline-flex;align-items:center;gap:4px;height:20px}
+.mark i{display:block;width:4px;border-radius:2px;background:var(--blue-m)}
+h1{margin:6px 0 0;font:56px/1.1 var(--fs);color:var(--navy);letter-spacing:-.005em}
+.ctrl{display:flex;gap:10px;align-items:center;padding-bottom:6px}
+.kbd{font-size:17px;color:var(--muted);margin-right:8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;height:46px;padding:0 20px;font:inherit;font-size:18px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.go{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn:focus-visible,.step:focus-visible{outline:3px solid var(--blue);outline-offset:1px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 500px;gap:20px;min-height:0}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;min-width:0;display:flex}
+#flow{display:block;width:100%;height:100%}
+.steps{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px 14px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
+.steps-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 10px}
+.cap{font-size:17px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+#count{font:600 17px var(--mono);color:var(--blue)}
+#steplist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;flex:1;min-height:0}
+.grp-h{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--wire);padding:9px 12px 1px}
+.step{appearance:none;width:100%;text-align:left;font:inherit;color:var(--ink);background:none;border:1.5px solid transparent;border-radius:12px;
+  padding:6px 12px;cursor:pointer;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:4px;position:relative;overflow:hidden}
+.step .n{grid-row:1/3;font:20px var(--mono);color:var(--wire);padding-top:4px}
+.step .t{font:25px/1.3 var(--fs);color:var(--muted)}
+.step .d{display:none;font-size:23.5px;line-height:1.36;color:var(--ink);padding:3px 0 4px}
+.step:hover{background:var(--soft)}
+.step.done .n{color:var(--blue)}
+.step.done .t{color:var(--ink)}
+.step.on{background:var(--blue-bg);border-color:var(--blue-m)}
+.step.on .t{color:var(--navy)}
+.step.on .n{color:var(--blue)}
+.step.on .d{display:block}
+.step .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;background:var(--blue-m);transform-origin:left;transform:scaleX(0)}
+footer{display:flex;gap:28px;font-size:17px;color:var(--muted);padding:0 4px}
+footer .lg{display:inline-flex;align-items:center;gap:8px}
+footer .lg i{display:inline-block;width:22px;height:15px;border-radius:4px}
+
+/* record mode: just the 1864x800 board + steps, laid on a white slide */
+.record,.record body{background:#fff}
+.record .stage{left:0;top:0;transform:none!important;width:1864px;height:800px;padding:0;display:block;background:#fff}
+.record header,.record footer,.record .grp-h{display:none}
+.record .main{height:800px}
+
+/* svg */
+.card{fill:var(--panel);stroke:var(--line);stroke-width:1.6}
+.card-soft{fill:var(--soft);stroke:var(--line);stroke-width:1.4}
+.card-blue{fill:var(--blue-bg);stroke:var(--blue-m);stroke-width:2}
+.card-red{fill:var(--red-bg);stroke:var(--red);stroke-width:2}
+.card-green{fill:var(--green-bg);stroke:var(--green);stroke-width:2}
+.card-amber{fill:var(--amber-bg);stroke:var(--amber);stroke-width:2;stroke-dasharray:8 6}
+.card-ext{fill:var(--soft);stroke:var(--wire);stroke-width:1.8;stroke-dasharray:8 6}
+.chip{fill:var(--pale);stroke:none}
+.chip-blue{fill:var(--blue-bg)} .chip-red{fill:var(--red-bg)} .chip-green{fill:var(--green-bg)} .chip-amber{fill:var(--amber-bg)}
+.chip-wr{fill:#fff;stroke:var(--red);stroke-width:1.6} .chip-wg{fill:#fff;stroke:var(--green);stroke-width:1.6}
+.chip-solid-blue{fill:var(--blue-m)} .chip-solid-red{fill:var(--red)} .chip-solid-green{fill:var(--green)} .chip-solid-navy{fill:var(--navy)}
+.wire{fill:none;stroke:var(--wire);stroke-width:2.6}
+.w-blue{fill:none;stroke:var(--blue);stroke-width:2.8} .w-red{fill:none;stroke:var(--red);stroke-width:2.8}
+.w-green{fill:none;stroke:var(--green);stroke-width:2.8} .w-amber{fill:none;stroke:var(--amber);stroke-width:2.8}
+.w-navy{fill:none;stroke:var(--navy);stroke-width:2.8}
+.ghostline{opacity:.14}
+.dash{stroke-dasharray:8 7}
+.glow{fill:none;stroke:var(--blue-m);stroke-width:3.2}
+.ic *{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.t-title{font:27px var(--fs);fill:var(--navy)}
+.t-head{font:31px var(--fs);fill:var(--navy)}
+.t-sub{font:21.5px var(--f);fill:var(--muted)}
+.t-body{font:22px var(--f);fill:var(--ink)}
+.t-prob{font:21px var(--fs);fill:var(--red)}
+.t-ok{font:21px var(--fs);fill:var(--green)}
+.t-amb{font:21px var(--fs);fill:var(--amber)}
+.t-blue{font:21px var(--fs);fill:var(--blue)}
+.t-mono{font:21px var(--mono);fill:var(--ink)}
+.t-mono-s{font:19.5px var(--mono);fill:var(--ink)}
+.t-chip{font:19.5px var(--fs);fill:var(--ink)}
+.t-cap{font:700 18.5px var(--f);letter-spacing:.08em;fill:var(--muted)}
+.t-white{fill:#fff}
+.ptr{fill:var(--navy);stroke:#fff;stroke-width:1.8;stroke-linejoin:round}
+.clickring{fill:none;stroke:var(--blue-m);stroke-width:3.5}
+.dot{fill:var(--blue-m)}
+
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <header>
+    <div>
+      <div class="eyebrow"><span class="mark"><i style="height:9px"></i><i style="height:18px"></i><i style="height:12px"></i><i style="height:20px"></i><i style="height:10px"></i></span>04   Extending with AI</div>
+      <h1>Ask AI, end to end</h1>
+    </div>
+    <div class="ctrl">
+      <span class="kbd">&larr; &rarr; step &middot; Space replay</span>
+      <button class="btn" id="prev">Back</button>
+      <button class="btn" id="again">Replay</button>
+      <button class="btn" id="next">Next</button>
+      <button class="btn go" id="all">Play all</button>
+    </div>
+  </header>
+  <div class="main">
+    <div class="board"><svg id="flow" viewBox="0 0 1200 714" role="img" aria-label="One Ask AI summary request traced from the Frontend through MAGOR Studio to the SpeechLab gateway and back."></svg></div>
+    <aside class="steps" aria-label="Steps">
+      <div class="steps-head"><span class="cap">Steps</span><span id="count"></span></div>
+      <ol id="steplist"></ol>
+    </aside>
+  </div>
+  <footer><span>Soh Zi Xiang &middot; CCDS25-1034 &middot; MAGOR</span><span class="lg"><i style="background:var(--blue-bg);border:2px solid var(--blue-m)"></i>MAGOR</span><span class="lg"><i style="background:var(--soft);border:2px solid var(--wire)"></i>outside MAGOR</span><span class="lg"><i style="background:var(--green-bg);border:2px solid var(--green)"></i>stored</span><span style="margin-left:auto">Source: FYP report, Section 4.5</span></footer>
+</div>
+<script>
+const ICONS={"audio-lines": "<path d=\"M2 10v3\" /> <path d=\"M6 6v11\" /> <path d=\"M10 3v18\" /> <path d=\"M14 8v7\" /> <path d=\"M18 5v13\" /> <path d=\"M22 10v3\" />", "circle": "<circle cx=\"12\" cy=\"12\" r=\"10\" />", "circle-check": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m16 9-5.5 5.5L8 12\" />", "circle-dashed": "<path d=\"M10.1 2.182a10 10 0 0 1 3.8 0\" /> <path d=\"M13.9 21.818a10 10 0 0 1-3.8 0\" /> <path d=\"M17.609 3.721a10 10 0 0 1 2.69 2.7\" /> <path d=\"M2.182 13.9a10 10 0 0 1 0-3.8\" /> <path d=\"M20.279 17.609a10 10 0 0 1-2.7 2.69\" /> <path d=\"M21.818 10.1a10 10 0 0 1 0 3.8\" /> <path d=\"M3.721 6.391a10 10 0 0 1 2.7-2.69\" /> <path d=\"M6.391 20.279a10 10 0 0 1-2.69-2.7\" />", "circle-x": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m15 9-6 6\" /> <path d=\"m9 9 6 6\" />", "cloud": "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\" />", "database": "<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" />", "file-text": "<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /> <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /> <path d=\"M10 9H8\" /> <path d=\"M16 13H8\" /> <path d=\"M16 17H8\" />", "key-round": "<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />", "loader-circle": "<path d=\"M21 12a9 9 0 1 1-6.219-8.56\" />", "play": "<path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\" />", "refresh-cw": "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /> <path d=\"M21 3v5h-5\" /> <path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /> <path d=\"M8 16H3v5\" />", "shield-check": "<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /> <path d=\"m9 12 2 2 4-4\" />", "sparkles": "<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />", "summary": "<path d=\"M15 4H7\" /> <path d=\"m18 16 3 3-3 3\" /> <path d=\"M3 4v13a2 2 0 0 0 2 2h16\" /> <path d=\"M7 14h7\" /> <path d=\"M7 9h12\" />", "triangle-alert": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /> <path d=\"M12 9v4\" /> <path d=\"M12 17h.01\" />"};
+/* ---------- shared animation engine (deterministic: every frame is a pure function of T) ---------- */
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('flow');
+const RECORD=/[?&]record\b/.test(location.search);
+if(RECORD)document.documentElement.classList.add('record');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let AMB=0, cur=-1, T=0;
+
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in (attrs||{}))e.setAttribute(k,attrs[k]);(parent||svg).appendChild(e);return e}
+function grp(parent){return el('g',{},parent)}
+function txt(x,y,s,cls,parent,anchor){const t=el('text',{x,y,class:cls||'t-sub','text-anchor':anchor||'start'},parent);t.textContent=s;return t}
+function box(x,y,w,h,cls,parent,rx){return el('rect',{x,y,width:w,height:h,rx:rx==null?12:rx,class:cls},parent)}
+function icon(name,x,y,size,color,parent){
+  const g=el('g',{transform:`translate(${x} ${y}) scale(${size/24})`,class:'ic'},parent);
+  g.style.color=color||'var(--ink)';g.innerHTML=ICONS[name]||'';return g}
+function iconDisc(name,cx,cy,r,color,bg,parent){
+  const g=grp(parent);el('circle',{cx,cy,r,style:`fill:${bg}`},g);
+  icon(name,cx-r*.58,cy-r*.58,r*1.16,color,g);return g}
+
+/* a rounded pill sized to its measured label; returns {g,r,t,w} */
+function pill(parent,x,y,h,label,rc,tc,o){o=o||{};const g=grp(parent);const r=box(x,y,10,h,rc,g,o.rx==null?h/2:o.rx);
+  const pad=o.pad==null?16:o.pad,ic=o.icon?h*.62:0,gap=o.icon?8:0;
+  if(o.icon)icon(o.icon,x+pad-2,y+(h-ic)/2,ic,o.icol||'var(--muted)',g);
+  const t=txt(x+pad+ic+gap,y+h/2+(o.dy==null?7:o.dy),label,tc,g);if(o.fill)t.style.fill=o.fill;
+  const w=Math.ceil(pad+ic+gap+t.getComputedTextLength()+pad);r.setAttribute('width',w);return {g,r,t,w}}
+/* lay pills (made at x=0) out in a row ending at xr */
+function rowRight(items,xr,gap){let x=xr;for(let i=items.length-1;i>=0;i--){x-=items[i].w;items[i].g.setAttribute('transform',`translate(${x} 0)`);items[i].x=x;x-=gap}}
+
+/* timeline */
+const tweens=[];
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const eio=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+const lin=p=>p;
+const back=p=>{const c1=1.70158,c3=c1+1;return p<=0?0:1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const lerp=(a,b,p)=>a+(b-a)*p;
+function tw(t0,d,fn,o){o=o||{};tweens.push({t0,d,fn,mod:!!o.mod,ease:o.ease||eio})}
+function render(t){for(const w of tweens){if(w.mod&&t<w.t0)continue;const p=clamp((t-w.t0)/w.d);w.fn(w.ease(p),t,p)}}
+function always(fn){tw(0,1e9,(p,t)=>fn(t),{ease:lin})}
+const op=(e,v)=>{e.style.opacity=v};
+const G=.12;
+const ghostIn=(e,t0,d)=>tw(t0,d||.5,p=>op(e,G+(1-G)*p));
+const fadeIn=(e,t0,d)=>tw(t0,d||.4,p=>op(e,p));
+const fadeOut=(e,t0,d,to)=>tw(t0,d||.4,p=>op(e,lerp(1,to||0,p)),{mod:true});
+function pop(e,cx,cy,t0,d,from){from=from==null?G:from;
+  tw(t0,d||.55,(p,t,raw)=>{const s=raw<=0?1:lerp(.62,1,p);
+    e.setAttribute('transform',`translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})`);
+    op(e,raw<=0?from:from+(1-from)*clamp(raw*2.2))},{ease:back})}
+function moveTo(e,t0,d,x0,y0,x1,y1){tw(t0,d,(p)=>e.setAttribute('transform',`translate(${lerp(x0,x1,p)} ${lerp(y0,y1,p)})`))}
+function swapText(e,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.textContent!==v)e.textContent=v})}
+function swapAttr(e,attr,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.getAttribute(attr)!==v)e.setAttribute(attr,v)})}
+
+/* arrows: a faint ghost of the route, then the real stroke draws on */
+const MARK={wire:'ah','w-blue':'ah-b','w-red':'ah-r','w-green':'ah-g','w-amber':'ah-a','w-navy':'ah-n'};
+function arrow(d,t0,dur,parent,cls,opts){opts=opts||{};cls=cls||'wire';
+  const m=`url(#${MARK[cls]||'ah'})`;
+  const base=el('path',{d,class:cls+' ghostline','marker-end':opts.nohead?'':m},parent);
+  if(opts.noghost)op(base,0);
+  const p=el('path',{d,class:cls,pathLength:1,'stroke-dasharray':'1 1'},parent);
+  tw(t0,dur||.5,q=>{p.style.strokeDashoffset=1-q;op(p,q>0?1:0);
+    if(q>.97&&!opts.nohead)p.setAttribute('marker-end',m);else p.removeAttribute('marker-end')});
+  return p}
+function packet(path,shape,t0,d,rev){const L=path.getTotalLength();op(shape,0);
+  tw(t0,d||.9,(p,t,raw)=>{if(raw<=0||raw>=1){op(shape,0);return}
+    const q=rev?1-p:p;const pt=path.getPointAtLength(q*L);op(shape,1);
+    shape.setAttribute('transform',`translate(${pt.x} ${pt.y})`)})}
+function hiddenPath(d){const p=el('path',{d,fill:'none',stroke:'none'});return p}
+/* outline on the box that is the focus of the current step: pulses live, holds steady in a recording
+   (each recorded step ends on a frozen frame, so a pulse would freeze mid-ring) */
+function glowStep(b,idx,color,rx){
+  const g=el('rect',{x:b.x,y:b.y,width:b.w,height:b.h,rx:rx||16,class:'glow'});if(color)g.style.stroke=color;op(g,0);
+  always(t=>{if(cur!==idx){op(g,0);return}
+    if(RECORD){const k=0;   /* on the card's own outline, so it reads as one thicker border */
+      g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);
+      op(g,.9*clamp((t-PH[idx][0])/.35));return}
+    const ph=(AMB%1.4)/1.4,k=ph*9;
+    g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);op(g,.6*(1-ph))});
+  return g}
+/* mouse pointer used to show clicks */
+function pointer(parent){const g=grp(parent);
+  el('path',{d:'M0 0L0 22L6 17L10 26L14 24L10 15L18 15Z',class:'ptr'},g);op(g,0);return g}
+function clickPulse(cx,cy,t0,parent){const c=el('circle',{cx,cy,r:4,class:'clickring'},parent);op(c,0);
+  tw(t0,.55,(p,t,raw)=>{if(raw<=0||raw>=1){op(c,0);return}c.setAttribute('r',4+22*p);op(c,.8*(1-p))},{ease:lin})}
+
+/* defs: arrowheads in each wire colour */
+const defs=el('defs');
+[['ah','var(--wire)'],['ah-b','var(--blue)'],['ah-r','var(--red)'],['ah-g','var(--green)'],['ah-a','var(--amber)'],['ah-n','var(--navy)']].forEach(([id,c])=>{
+  const mk=el('marker',{id,viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);
+  el('path',{d:'M0 0L10 5L0 10z',style:`fill:${c}`},mk)});
+
+/* Scene C: one Ask AI summary, end to end (viewBox 1200 x 714) */
+const END=38;
+
+/* piecewise keyframes [t,x,y,o]: pure position/opacity at any t */
+function kf(frames){return t=>{if(t<=frames[0][0])return frames[0].slice(1);
+  for(let i=1;i<frames.length;i++){const a=frames[i-1],b=frames[i];if(t<=b[0]){const p=eio(clamp((t-a[0])/(b[0]-a[0])));
+    return [lerp(a[1],b[1],p),lerp(a[2],b[2],p),lerp(a[3],b[3],p)]}}return frames[frames.length-1].slice(1)}}
+function spin(g,cx,cy){always(t=>g.setAttribute('transform',`rotate(${(t*300)%360} ${cx} ${cy})`))}
+function lit(p,t0,t1,rc,col){const rc0=p.r.getAttribute('class'),c0=p.t.style.fill;
+  always(t=>{const on=t>=t0&&(t1==null||t<t1);p.r.setAttribute('class',on?rc:rc0);p.t.style.fill=on?col:c0})}
+
+/* ================= Frontend: the Ask AI tab ================= */
+const fe=grp();
+box(20,14,400,686,'card',fe,18);
+el('path',{d:'M20 32a18 18 0 0 1 18-18h364a18 18 0 0 1 18 18v28H20z',style:'fill:var(--pale)'},fe);
+[40,58,76].forEach(x=>el('circle',{cx:x,cy:37,r:5.5,style:'fill:var(--line)'},fe));
+txt(96,44,'Recordings page','t-sub',fe);
+/* the page's own tab buttons: Transcript is open until the user clicks Ask AI */
+const bTr=pill(fe,36,70,36,'Transcript','chip-solid-blue','t-chip',{fill:'#fff',pad:14,rx:6});
+const bAi=pill(fe,36+bTr.w+8,70,36,'Ask AI','card','t-chip',{fill:'var(--muted)',icon:'sparkles',icol:'var(--amber)',pad:12,rx:6});
+const AIX=36+bTr.w+8+bAi.w/2;
+always(t=>{const on=t>=1.05;bTr.r.setAttribute('class',on?'card':'chip-solid-blue');bTr.t.style.fill=on?'var(--muted)':'#fff';
+  bAi.r.setAttribute('class',on?'chip-solid-blue':'card');bAi.t.style.fill=on?'#fff':'var(--muted)'});
+/* transcript view, replaced by the Ask AI view on that click */
+const trv=grp(fe);
+for(let i=0;i<5;i++){const y=128+i*78;
+  pill(trv,36,y,26,'channel1_S'+(1+i%2),'chip-blue','t-mono-s',{fill:'var(--blue)',pad:8,dy:5});
+  [330,300,190].forEach((w,j)=>el('rect',{x:36,y:y+36+j*13,width:w,height:7,rx:3.5,style:'fill:var(--wire);opacity:.45'},trv))}
+fadeOut(trv,1.05,.25);
+const view=grp(fe);op(view,0);fadeIn(view,1.05,.3);
+const tabS=txt(40,132,'Summarize','t-chip',view);tabS.style.fill='var(--blue)';
+el('rect',{x:40,y:140,width:tabS.getComputedTextLength(),height:3,rx:1.5,style:'fill:var(--blue-m)'},view);
+const tabQ=txt(68+tabS.getComputedTextLength(),132,'Q&A','t-chip',view);tabQ.style.fill='var(--muted)';
+el('line',{x1:36,y1:144,x2:404,y2:144,style:'stroke:var(--line);stroke-width:1.2'},view);
+const genR=box(36,152,368,34,'chip-solid-blue',view,6);
+const genT=txt(220,175,'Generate Summary','t-chip',view,'middle');genT.style.fill='#fff';
+pop(fe,220,357,.2,.5);
+
+/* summary card */
+const sc=grp(view);box(36,192,368,330,'card-soft',sc,14);
+const body=grp(sc);
+[[214,220],[236,310],[258,190]].forEach(([y,w],i)=>{const r=el('rect',{x:52,y,width:w,height:10,rx:5,style:'fill:var(--wire);opacity:.6'},body);fadeIn(r,26.7+i*.12,.3)});
+const TS=['01:32–03:45','00:52–01:03','01:48–02:30','03:05–03:40'];
+const tsPills=[];
+{const p=pill(body,252,249,28,TS[0],'chip','t-mono-s',{fill:'var(--muted)',pad:10,dy:6});fadeIn(p.g,27.0,.3);tsPills.push(p)}
+const kp=txt(52,316,'Key points','t-body',body);kp.style.fontWeight=600;fadeIn(kp,27.15,.3);
+for(let i=0;i<3;i++){const y=334+i*62,g=grp(body);
+  el('circle',{cx:58,cy:y+8,r:4.5,style:'fill:var(--navy)'},g);
+  el('rect',{x:72,y:y+3,width:86,height:10,rx:5,style:'fill:var(--navy);opacity:.75'},g);
+  el('rect',{x:166,y:y+3,width:206-i*34,height:10,rx:5,style:'fill:var(--wire);opacity:.55'},g);
+  const p=pill(g,72,y+22,28,TS[i+1],'chip','t-mono-s',{fill:'var(--muted)',pad:10,dy:6});tsPills.push(p);
+  fadeIn(g,27.4+i*.3,.3)}
+tsPills.forEach((p,i)=>lit(p,28.9+i*.15,null,'chip-blue','var(--blue)'));
+const san=pill(sc,0,204,30,'sanitized','chip-green','t-chip',{fill:'var(--green)',icon:'shield-check',icol:'var(--green)',pad:10});
+san.g.setAttribute('transform',`translate(${392-san.w} 0)`);op(san.g,0);
+tw(28.4,.3,p=>op(san.g,p));
+glowStep({x:36,y:192,w:368,h:330},7,'var(--blue-m)',14);
+
+/* status line under the summary */
+const stG=grp(view);
+const stSpin=grp(stG);icon('loader-circle',40,536,24,'var(--blue)',stSpin);spin(stSpin,52,548);
+const stOk=grp(stG);icon('circle-check',40,536,24,'var(--green)',stOk);
+const stT=txt(74,556,'','t-sub',stG);
+swapText(stT,[[0,''],[2.2,'Generating summary…'],[17.2,'Polling every 3 s · poll 1'],[18.95,'Polling every 3 s · poll 2'],[20.75,'Polling every 3 s · poll 3'],[25.4,'Summary ready'],[26.5,'']]);
+always(t=>{const busy=t>=2.2&&t<25.4,ok=t>=25.4&&t<26.5;op(stSpin,busy?1:0);op(stOk,ok?1:0);stT.setAttribute('class',ok?'t-ok':'t-sub')});
+glowStep({x:30,y:528,w:380,h:42},5,'var(--blue-m)',12);
+
+/* mini player */
+const pl=grp(fe);box(36,606,368,80,'card-soft',pl,14);
+icon('play',50,626,26,'var(--navy)',pl);
+el('rect',{x:92,y:636,width:296,height:6,rx:3,style:'fill:var(--line)'},pl);
+const fill=el('rect',{x:92,y:636,width:0,height:6,rx:3,style:'fill:var(--blue-m)'},pl);
+const head=el('circle',{cx:92,cy:639,r:8,style:'fill:var(--blue)'},pl);
+const tm=txt(92,674,'00:00 / 05:00','t-mono-s',pl);
+tw(31.3,.6,p=>{const x=296*52/300*p;fill.setAttribute('width',x);head.setAttribute('cx',92+x)});
+swapText(tm,[[0,'00:00 / 05:00'],[31.6,'00:52 / 05:00']]);
+glowStep({x:36,y:606,w:368,h:80},8,'var(--blue-m)',14);
+glowStep({x:30,y:64,w:380,h:128},0,'var(--blue-m)',12);
+
+/* ================= MAGOR Studio ================= */
+const st=grp();const stR=box(460,14,330,300,'card',st,18);
+iconDisc('audio-lines',506,56,26,'var(--blue)','var(--blue-bg)',st);
+txt(546,66,'MAGOR Studio','t-title',st);txt(482,104,'the Ask AI endpoints','t-sub',st);
+const tok=pill(st,482,122,36,'token: none','chip','t-chip',{fill:'var(--muted)',icon:'key-round',icol:'var(--muted)',pad:12});
+const tokOk=pill(st,482,122,36,'token: cached','chip-green','t-chip',{fill:'var(--green)',icon:'key-round',icol:'var(--green)',pad:12});
+tw(9.0,.3,p=>{op(tok.g,1-p);op(tokOk.g,p)});
+const sSum=pill(st,482,170,36,'POST /ai/summarize','chip','t-mono-s',{fill:'var(--muted)',pad:12,dy:6});
+const sPoll=pill(st,482,218,36,'GET /ai/poll/:taskId','chip','t-mono-s',{fill:'var(--muted)',pad:12,dy:6});
+lit(sSum,10.4,14.0,'chip-blue','var(--blue)');
+lit(sPoll,17.2,26.5,'chip-blue','var(--blue)');
+lit(sPoll,36.0,37.4,'chip-blue','var(--blue)');
+pop(st,625,164,7.1,.5);
+glowStep({x:460,y:14,w:330,h:300},2,'var(--blue-m)',18);
+
+/* ================= SpeechLab gateway (outside MAGOR) ================= */
+const gw=grp();box(830,14,350,300,'card-ext',gw,18);
+iconDisc('cloud',872,56,26,'var(--muted)','var(--pale)',gw);
+txt(910,66,'SpeechLab gateway','t-title',gw);txt(852,104,'outside MAGOR','t-sub',gw);
+const gLog=pill(gw,852,122,36,'/login','chip','t-mono-s',{fill:'var(--muted)',pad:12,dy:6});
+const gLlm=pill(gw,852,170,36,'/llm','chip','t-mono-s',{fill:'var(--muted)',pad:12,dy:6});
+const gTask=pill(gw,852,218,36,'/llm/tasks/:id','chip','t-mono-s',{fill:'var(--muted)',pad:12,dy:6});
+lit(gLog,7.9,9.0,'chip-blue','var(--blue)');
+lit(gLlm,11.0,12.6,'chip-blue','var(--blue)');
+lit(gTask,17.2,24.0,'chip-blue','var(--blue)');
+lit(gTask,36.2,37.0,'chip-blue','var(--blue)');
+/* the queued task */
+const tk=grp(gw);const tkR=box(850,264,310,42,'card',tk,10);
+const tkSpin=grp(tk);icon('loader-circle',862,273,24,'var(--amber)',tkSpin);spin(tkSpin,874,285);
+const tkOk=grp(tk);icon('circle-check',862,273,24,'var(--green)',tkOk);
+txt(896,292,'GENERAL · meadow9','t-mono-s',tk);
+const done=pill(tk,0,270,30,'done','chip-green','t-chip',{fill:'var(--green)',pad:12});done.g.setAttribute('transform',`translate(${1150-done.w} 0)`);
+op(tk,0);fadeIn(tk,11.5,.35);
+always(t=>{const ok=t>=23.2;op(tkSpin,ok?0:1);op(tkOk,ok?1:0);op(done.g,ok?1:0);tkR.setAttribute('class',ok?'card-green':'card')});
+pop(gw,1005,164,7.4,.5);
+glowStep({x:850,y:264,w:310,h:42},3,'var(--amber)',10);
+
+/* ================= MongoDB: the recording's Media document ================= */
+const md=grp();box(460,348,720,150,'card',md,16);
+iconDisc('database',496,382,20,'var(--blue)','var(--blue-bg)',md);
+txt(526,389,'MONGODB · MEDIA DOCUMENT','t-cap',md);
+[['summaryTaskId',418],['summaryTaskStatus',450],['summary',482]].forEach(([k,y])=>{const t=txt(482,y,k+':','t-mono-s',md);t.style.fill='var(--muted)'});
+const vId=txt(712,418,'','t-mono-s',md),vSt=txt(712,450,'','t-mono-s',md),vSu=txt(712,482,'','t-mono-s',md);
+swapText(vId,[[0,'not set'],[14.6,'"7f3a9c…"']]);
+swapText(vSt,[[0,'not set'],[15.0,'"processing"'],[24.2,'"done"']]);
+swapText(vSu,[[0,'not set'],[24.5,'"<p>The lecture covers…"']]);
+always(t=>{vSt.style.fill=t>=24.2?'var(--green)':t>=15?'var(--amber)':'var(--muted)';vId.style.fill=t>=14.6?'var(--ink)':'var(--muted)';vSu.style.fill=t>=24.5?'var(--ink)':'var(--muted)'});
+pop(md,820,423,14.0,.5);
+glowStep({x:460,y:348,w:720,h:150},4,'var(--amber)',16);
+glowStep({x:460,y:348,w:720,h:150},6,'var(--green)',16);
+
+/* ================= prepared transcript ================= */
+const pr=grp();box(460,522,720,178,'card',pr,16);
+iconDisc('file-text',496,556,20,'var(--blue)','var(--blue-bg)',pr);
+txt(526,563,'PREPARED TRANSCRIPT','t-cap',pr);
+const prSub=txt(526+250,563,'one line per segment','t-sub',pr);
+const LINES=[['channel1_','S1 00:52.10 01:03.40 so the main idea is'],['channel1_','S2 01:03.40 01:10.05 right, and the'],['channel1_','S1 01:10.05 01:25.60 which means we']];
+LINES.forEach(([pre,rest],i)=>{const y=602+i*34,g=grp(pr);
+  const a=txt(482,y,pre,'t-mono-s',g);const w=a.getComputedTextLength()+0;
+  const b=txt(482+w,y,rest,'t-mono-s',g);
+  const k=el('line',{x1:480,y1:y-6,x2:480,y2:y-6,style:'stroke:var(--red);stroke-width:2.4'},g);
+  fadeIn(g,3.6+i*.3,.3);
+  always(t=>{const hi=clamp((t-5.0)/.3),sk=clamp((t-5.3)/.3),gone=eio(clamp((t-5.8)/.6));
+    a.style.fill=hi>.5?'var(--red)':'var(--muted)';k.setAttribute('x2',480+(w+4)*sk);
+    op(a,1-gone);op(k,1-gone);b.setAttribute('x',lerp(482+w,482,gone))})});
+const note=txt(1160,563,'the ASR’s default ids only','t-amb',pr,'end');op(note,0);
+always(t=>op(note,clamp((t-5.0)/.3)*(1-clamp((t-7.0)/.3))));
+always(t=>op(prSub,1-clamp((t-5.0)/.3)+clamp((t-7.0)/.3)));
+pop(pr,820,611,3.1,.5);
+glowStep({x:460,y:522,w:720,h:178},1,'var(--blue-m)',16);
+
+/* ================= wires ================= */
+const A=(d,t,c,o)=>arrow(d,t,.25,null,c||'w-blue',o);
+A('M420 611L460 611',3.3);
+A('M790 132L830 132',7.8); A('M830 152L790 152',8.5,'w-green');
+A('M420 180L460 180',10.2); A('M790 180L830 180',10.9); A('M830 200L790 200',12.2); A('M460 202L420 202',12.8);
+A('M625 314L625 348',14.2,'w-amber');
+A('M420 228L460 228',17.3); A('M790 228L830 228',17.6); A('M830 248L790 248',17.9); A('M460 250L420 250',18.2);
+
+/* ================= packets ================= */
+const dot=c=>el('circle',{r:7,style:`fill:${c}`});
+const hp=hiddenPath;
+const H={f2p:hp('M420 611L460 611'),log:hp('M790 132L830 132'),logR:hp('M830 152L790 152'),
+  f2s:hp('M420 180L460 180'),s2g:hp('M790 180L830 180'),g2s:hp('M830 200L790 200'),s2f:hp('M460 202L420 202'),
+  s2m:hp('M625 314L625 348'),pf2s:hp('M420 228L460 228'),ps2g:hp('M790 228L830 228'),pg2s:hp('M830 248L790 248'),ps2f:hp('M460 250L420 250')};
+packet(H.f2p,dot('var(--blue-m)'),3.3,.3);
+packet(H.log,dot('var(--blue-m)'),7.85,.3);
+{const g=grp();icon('key-round',-11,-11,22,'var(--green)',g);packet(H.logR,g,8.55,.4)}
+/* step 4: the prepared transcript itself is what goes to Studio */
+{const up=arrow('M460 586L440 586L440 166L458 166',10.0,.5,null,'w-blue',{noghost:true});
+  const g=grp();icon('file-text',-11,-11,22,'var(--blue)',g);packet(hp('M460 586L440 586L440 166L458 166'),g,10.05,.6);
+}
+glowStep({x:460,y:522,w:720,h:178},3,'var(--blue-m)',16);
+{const g=grp();icon('file-text',-11,-11,22,'var(--blue)',g);packet(H.s2g,g,10.95,.35);}
+packet(H.g2s,dot('var(--amber)'),12.25,.3);
+packet(H.s2f,dot('var(--amber)'),12.85,.3);
+packet(H.s2m,dot('var(--amber)'),14.25,.3);
+[17.3,19.1,20.9].forEach(t=>{packet(H.pf2s,dot('var(--blue-m)'),t,.25);packet(H.ps2g,dot('var(--blue-m)'),t+.3,.25);
+  packet(H.pg2s,dot('var(--amber)'),t+.6,.25);packet(H.ps2f,dot('var(--amber)'),t+.9,.25)});
+packet(H.pg2s,dot('var(--green)'),23.5,.3);
+packet(H.s2m,dot('var(--green)'),23.9,.3);
+packet(H.ps2f,dot('var(--green)'),25.0,.3);
+packet(H.pf2s,dot('var(--blue-m)'),36.05,.25);packet(H.ps2g,dot('var(--blue-m)'),36.3,.25);
+packet(H.pg2s,dot('var(--green)'),36.55,.25);packet(H.ps2f,dot('var(--green)'),36.8,.25);
+
+/* ================= if polling stops ================= */
+const ov=grp();box(52,224,336,306,'card',ov,14).style.strokeWidth=2;
+txt(72,264,'If polling stops','t-title',ov);
+const RS=['3 failed polls in a row','3-minute timeout','user leaves the tab'];
+RS.forEach((s,i)=>{const g=grp(ov);icon('circle-x',72,282+i*32,22,'var(--red)',g);txt(102,300+i*32,s,'t-prob',g);fadeIn(g,33.6+i*.3,.3)});
+{const g=grp(ov);icon('circle-check',72,378,22,'var(--green)',g);txt(102,396,'the task keeps running','t-ok',g);fadeIn(g,34.6,.3)}
+const cs=pill(ov,72,420,44,'Check Status','chip-solid-navy','t-chip',{fill:'#fff',icon:'refresh-cw',icol:'#fff',pad:16,dy:7});
+op(cs.g,0);fadeIn(cs.g,34.9,.3);
+{const g=grp(ov);icon('circle-check',72,476,22,'var(--green)',g);txt(102,494,'summary fetched','t-ok',g);fadeIn(g,37.1,.3)}
+op(ov,0);
+always(t=>op(ov,clamp((t-33.2)/.35)));
+ov.setAttribute('transform','translate(0 -12)');
+glowStep({x:52,y:212,w:336,h:306},9,'var(--red)',14);
+
+/* ================= the pointer ================= */
+const ptr=pointer();
+const PK=kf([[0,330,330,0],[.3,330,330,0],[.45,330,330,1],[.95,AIX,88,1],[1.3,AIX,88,1],[1.75,220,169,1],[2.25,220,169,1],[2.55,220,169,0],
+  [30.0,300,480,0],[30.2,300,480,1],[31.0,124,372,1],[32.0,124,372,1],[32.4,124,372,0],
+  [35.0,270,560,0],[35.2,270,560,1],[35.8,160,442,1],[36.6,160,442,1],[36.9,160,442,0]]);
+always(t=>{const [x,y,o]=PK(t);ptr.setAttribute('transform',`translate(${x} ${y})`);op(ptr,o)});
+clickPulse(AIX,88,1.0);clickPulse(220,169,1.95);clickPulse(124,372,31.1);clickPulse(160,442,35.9);
+always(t=>genR.style.opacity=(t>=1.95&&t<2.25)?.75:1);
+
+const PH=[
+  [0,'Generate','ask','The user opens the Ask AI tab, which starts on Summarize, and clicks Generate Summary.'],
+  [3,'Prepare','ask','The Frontend writes one line per segment and drops the channel1_ part of the ASR’s default speaker ids, which only costs tokens. Renamed speakers keep their names.'],
+  [7,'Log in','ask','Studio logs in to the SpeechLab gateway and caches the token for later requests.'],
+  [10,'Submit','ask','The prepared transcript goes to Studio, which submits a GENERAL task to the meadow9 queue and gets back a task ID, not an answer.'],
+  [14,'Record','ask','The task ID is saved on the recording’s Media document as processing.'],
+  [17,'Poll','wait','Every 3 seconds, for up to 3 minutes, the Frontend asks Studio and Studio asks the gateway.'],
+  [23,'Done','wait','When the gateway reports done, Studio stores the summary on the Media document.'],
+  [26.5,'Render','show','The HTML is sanitized and every timestamp becomes a link.'],
+  [30,'Seek','show','Clicking a timestamp jumps the player to that moment.'],
+  [33,'If polling stops','show','The task keeps running on the gateway, so Check Status can fetch the result later.']
+];
+const GRP={ask:'Ask',wait:'Wait',show:'Show'};
+
+/* ---------- step player: one step at a time, earlier steps resolve instantly ---------- */
+const list=document.getElementById('steplist');
+let html='',lastG='';
+PH.forEach(([t,title,g,d],i)=>{if(g!==lastG){html+=`<li class="grp-h ${g}">${GRP[g]}</li>`;lastG=g}
+  html+=`<li><button class="step" data-i="${i}"><span class="n">${String(i+1).padStart(2,'0')}</span><span class="t">${title}</span><span class="d">${d}</span><span class="bar"></span></button></li>`});
+list.innerHTML=html;
+const stepEls=[...list.querySelectorAll('.step')];
+const countEl=document.getElementById('count');
+const endOf=i=>i<PH.length-1?PH[i+1][0]:END;
+let playing=false,stopAt=0,all=false,last=0;
+function update(){
+  stepEls.forEach((b,i)=>{
+    b.classList.toggle('on',i===cur);b.classList.toggle('done',i<cur);
+    b.setAttribute('aria-current',i===cur?'step':'false');
+    const prog=i===cur?clamp((T-PH[i][0])/(endOf(i)-PH[i][0])):i<cur?1:0;
+    b.querySelector('.bar').style.transform=`scaleX(${i===cur?prog:0})`;
+  });
+  if(countEl)countEl.textContent=`${String(Math.max(cur,0)+1).padStart(2,'0')} / ${String(PH.length).padStart(2,'0')}`;
+  const pv=document.getElementById('prev'),nx=document.getElementById('next');
+  if(pv)pv.disabled=cur<=0; if(nx)nx.disabled=cur>=PH.length-1;
+}
+function select(i){cur=clamp(i,0,PH.length-1);all=false;T=PH[cur][0];stopAt=endOf(cur);playing=true;
+  if(reduce){T=stopAt;playing=false}update()}
+function frame(now){
+  const dt=last?Math.min(.25,(now-last)/1000):0;last=now;AMB+=dt;
+  if(playing){T+=dt;
+    if(all){let k=0;PH.forEach(([t],i)=>{if(T>=t)k=i});cur=k}
+    if(T>=stopAt){T=stopAt;playing=false}
+    update()}
+  render(T);requestAnimationFrame(frame)}
+stepEls.forEach(b=>b.onclick=()=>select(+b.dataset.i));
+document.getElementById('prev').onclick=()=>select(cur-1);
+document.getElementById('next').onclick=()=>select(cur+1);
+document.getElementById('again').onclick=()=>select(Math.max(cur,0));
+document.getElementById('all').onclick=()=>{cur=0;T=0;stopAt=END;all=true;playing=true;
+  if(reduce){T=END;cur=PH.length-1;playing=false}update()};
+document.addEventListener('keydown',e=>{
+  if(e.altKey||e.ctrlKey||e.metaKey)return;
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();select(cur+1)}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();select(cur-1)}
+  else if(e.key===' '&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();select(Math.max(cur,0))}
+  else if(e.key==='Home'){e.preventDefault();select(0)}
+});
+/* hooks for the frame-by-frame recorder */
+window.__meta=()=>({steps:PH.map(p=>p[0]),end:END});
+window.__frame=(t,amb,c)=>{T=t;AMB=amb;cur=c;playing=false;update();render(T)};
+/* fit the 1920x1080 stage to any window */
+const stage=document.getElementById('stage');
+function fit(){if(RECORD)return;const s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`translate(-50%,-50%) scale(${s})`}
+addEventListener('resize',fit);fit();
+cur=0;update();render(T);
+if(!RECORD)requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>

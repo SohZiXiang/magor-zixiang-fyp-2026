@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The life of a recording, and where it broke</title>
+<style>
+:root{
+  --bg:#F5F7FA; --panel:#FFFFFF; --ink:#202124; --navy:#0B1F3A; --muted:#5F6368; --wire:#9AA0A6;
+  --line:#DADCE0; --pale:#F1F3F4; --soft:#F8F9FA;
+  --blue:#1967D2; --blue-m:#4285F4; --blue-bg:#E8F0FE; --blue-line:#AECBFA;
+  --red:#D93025; --red-bg:#FCE8E6; --green:#188038; --green-bg:#E6F4EA;
+  --amber:#B06000; --amber-bg:#FEF7E0; --dark:#3C4043;
+  --f:'Segoe UI',system-ui,-apple-system,sans-serif; --fs:'Segoe UI Semibold','Segoe UI',system-ui,sans-serif;
+  --mono:Consolas,'Cascadia Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
+body{font-family:var(--f);color:var(--ink)}
+
+/* live page: a 1920x1080 stage scaled to the window */
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center;
+  padding:30px 28px 22px;display:grid;grid-template-rows:auto 870px auto;gap:18px;align-content:center;background:var(--bg)}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:0 4px}
+.eyebrow{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:700;letter-spacing:.09em;color:var(--blue);text-transform:uppercase}
+.mark{display:inline-flex;align-items:center;gap:4px;height:20px}
+.mark i{display:block;width:4px;border-radius:2px;background:var(--blue-m)}
+h1{margin:6px 0 0;font:56px/1.1 var(--fs);color:var(--navy);letter-spacing:-.005em}
+.ctrl{display:flex;gap:10px;align-items:center;padding-bottom:6px}
+.kbd{font-size:17px;color:var(--muted);margin-right:8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;height:46px;padding:0 20px;font:inherit;font-size:18px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.go{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn:focus-visible,.step:focus-visible{outline:3px solid var(--blue);outline-offset:1px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 500px;gap:20px;min-height:0}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;min-width:0;display:flex}
+#flow{display:block;width:100%;height:100%}
+.steps{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px 14px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
+.steps-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 10px}
+.cap{font-size:17px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+#count{font:600 17px var(--mono);color:var(--blue)}
+#steplist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;flex:1;min-height:0}
+.grp-h{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--wire);padding:9px 12px 1px}
+.step{appearance:none;width:100%;text-align:left;font:inherit;color:var(--ink);background:none;border:1.5px solid transparent;border-radius:12px;
+  padding:6px 12px;cursor:pointer;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:4px;position:relative;overflow:hidden}
+.step .n{grid-row:1/3;font:20px var(--mono);color:var(--wire);padding-top:4px}
+.step .t{font:25px/1.3 var(--fs);color:var(--muted)}
+.step .d{display:none;font-size:23.5px;line-height:1.36;color:var(--ink);padding:3px 0 4px}
+.step:hover{background:var(--soft)}
+.step.done .n{color:var(--blue)}
+.step.done .t{color:var(--ink)}
+.step.on{background:var(--blue-bg);border-color:var(--blue-m)}
+.step.on .t{color:var(--navy)}
+.step.on .n{color:var(--blue)}
+.step.on .d{display:block}
+.step .mk{position:absolute;right:12px;top:8px;width:30px;height:30px;opacity:0}
+.step .mk *{fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mk-ok *{stroke:var(--green)} .mk-bad *{stroke:var(--red)} .mk-amb *{stroke:var(--amber)}
+.step .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;background:var(--blue-m);transform-origin:left;transform:scaleX(0)}
+footer{display:flex;gap:28px;font-size:17px;color:var(--muted);padding:0 4px}
+footer .lg{display:inline-flex;align-items:center;gap:8px}
+footer .lg i{display:inline-block;width:22px;height:15px;border-radius:4px}
+
+/* record mode: just the 1864x800 board + steps, laid on a white slide */
+.record,.record body{background:#fff}
+.record .stage{left:0;top:0;transform:none!important;width:1864px;height:800px;padding:0;display:block;background:#fff}
+.record header,.record footer,.record .grp-h{display:none}
+.record .main{height:800px}
+
+/* svg */
+.card{fill:var(--panel);stroke:var(--line);stroke-width:1.6}
+.card-soft{fill:var(--soft);stroke:var(--line);stroke-width:1.4}
+.card-blue{fill:var(--blue-bg);stroke:var(--blue-m);stroke-width:2}
+.card-red{fill:var(--red-bg);stroke:var(--red);stroke-width:2}
+.card-green{fill:var(--green-bg);stroke:var(--green);stroke-width:2}
+.card-amber{fill:var(--amber-bg);stroke:var(--amber);stroke-width:2;stroke-dasharray:8 6}
+.card-ext{fill:var(--soft);stroke:var(--wire);stroke-width:1.8;stroke-dasharray:8 6}
+.chip{fill:var(--pale);stroke:none}
+.chip-blue{fill:var(--blue-bg)} .chip-red{fill:var(--red-bg)} .chip-green{fill:var(--green-bg)} .chip-amber{fill:var(--amber-bg)}
+.chip-wr{fill:#fff;stroke:var(--red);stroke-width:1.6} .chip-wg{fill:#fff;stroke:var(--green);stroke-width:1.6}
+.chip-solid-blue{fill:var(--blue-m)} .chip-solid-red{fill:var(--red)} .chip-solid-green{fill:var(--green)} .chip-solid-navy{fill:var(--navy)}
+.wire{fill:none;stroke:var(--wire);stroke-width:2.6}
+.w-blue{fill:none;stroke:var(--blue);stroke-width:2.8} .w-red{fill:none;stroke:var(--red);stroke-width:2.8}
+.w-green{fill:none;stroke:var(--green);stroke-width:2.8} .w-amber{fill:none;stroke:var(--amber);stroke-width:2.8}
+.w-navy{fill:none;stroke:var(--navy);stroke-width:2.8}
+.ghostline{opacity:.14}
+.dash{stroke-dasharray:8 7}
+.glow{fill:none;stroke:var(--blue-m);stroke-width:3.2}
+.ic *{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.t-title{font:27px var(--fs);fill:var(--navy)}
+.t-head{font:31px var(--fs);fill:var(--navy)}
+.t-sub{font:21.5px var(--f);fill:var(--muted)}
+.t-body{font:22px var(--f);fill:var(--ink)}
+.t-prob{font:21px var(--fs);fill:var(--red)}
+.t-ok{font:21px var(--fs);fill:var(--green)}
+.t-amb{font:21px var(--fs);fill:var(--amber)}
+.t-blue{font:21px var(--fs);fill:var(--blue)}
+.t-mono{font:21px var(--mono);fill:var(--ink)}
+.t-mono-s{font:19.5px var(--mono);fill:var(--ink)}
+.t-chip{font:19.5px var(--fs);fill:var(--ink)}
+.t-cap{font:700 18.5px var(--f);letter-spacing:.08em;fill:var(--muted)}
+.t-white{fill:#fff}
+.ptr{fill:var(--navy);stroke:#fff;stroke-width:1.8;stroke-linejoin:round}
+.clickring{fill:none;stroke:var(--blue-m);stroke-width:3.5}
+.dot{fill:var(--blue-m)}
+
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <header>
+    <div>
+      <div class="eyebrow"><span class="mark"><i style="height:9px"></i><i style="height:18px"></i><i style="height:12px"></i><i style="height:20px"></i><i style="height:10px"></i></span>01   Introducing MAGOR</div>
+      <h1>The life of a recording, and where it broke</h1>
+    </div>
+    <div class="ctrl">
+      <span class="kbd">&larr; &rarr; step &middot; Space replay</span>
+      <button class="btn" id="prev">Back</button>
+      <button class="btn" id="again">Replay</button>
+      <button class="btn" id="next">Next</button>
+      <button class="btn go" id="all">Play all</button>
+    </div>
+  </header>
+  <div class="main">
+    <div class="board"><svg id="flow" viewBox="0 0 1200 714" role="img" aria-label="One recording traced through MAGOR itself: the browser, MAGOR Studio with MongoDB and storage, and SpeechLab outside MAGOR, marking which stages worked and which were broken."></svg></div>
+    <aside class="steps" aria-label="Steps">
+      <div class="steps-head"><span class="cap">Steps</span><span id="count"></span></div>
+      <ol id="steplist"></ol>
+    </aside>
+  </div>
+  <footer><span>Soh Zi Xiang &middot; CCDS25-1034 &middot; MAGOR</span><span class="lg"><i style="background:var(--green-bg);border:2px solid var(--green)"></i>works</span><span class="lg"><i style="background:var(--red-bg);border:2px solid var(--red)"></i>broken</span><span class="lg"><i style="background:var(--amber-bg);border:2px solid var(--amber)"></i>not built yet</span><span style="margin-left:auto">Source: FYP report, Section 1.2 and Chapter 4</span></footer>
+</div>
+<script>
+const ICONS={"audio-lines": "<path d=\"M2 10v3\" /> <path d=\"M6 6v11\" /> <path d=\"M10 3v18\" /> <path d=\"M14 8v7\" /> <path d=\"M18 5v13\" /> <path d=\"M22 10v3\" />", "captions": "<rect width=\"18\" height=\"14\" x=\"3\" y=\"5\" rx=\"2\" ry=\"2\" /> <path d=\"M7 15h4M15 15h2M7 11h2M13 11h4\" />", "circle": "<circle cx=\"12\" cy=\"12\" r=\"10\" />", "circle-check": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m16 9-5.5 5.5L8 12\" />", "circle-dashed": "<path d=\"M10.1 2.182a10 10 0 0 1 3.8 0\" /> <path d=\"M13.9 21.818a10 10 0 0 1-3.8 0\" /> <path d=\"M17.609 3.721a10 10 0 0 1 2.69 2.7\" /> <path d=\"M2.182 13.9a10 10 0 0 1 0-3.8\" /> <path d=\"M20.279 17.609a10 10 0 0 1-2.7 2.69\" /> <path d=\"M21.818 10.1a10 10 0 0 1 0 3.8\" /> <path d=\"M3.721 6.391a10 10 0 0 1 2.7-2.69\" /> <path d=\"M6.391 20.279a10 10 0 0 1-2.69-2.7\" />", "circle-x": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m15 9-6 6\" /> <path d=\"m9 9 6 6\" />", "cloud": "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\" />", "download": "<path d=\"M12 15V3\" /> <path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /> <path d=\"m7 10 5 5 5-5\" />", "file-text": "<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /> <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /> <path d=\"M10 9H8\" /> <path d=\"M16 13H8\" /> <path d=\"M16 17H8\" />", "file-video": "<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /> <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /> <path d=\"M15.033 13.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56v-4.704a.645.645 0 0 1 .967-.56z\" />", "layout-dashboard": "<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /> <rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />", "monitor": "<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /> <line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /> <line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />", "package": "<path d=\"M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z\" /> <path d=\"M12 22V12\" /> <polyline points=\"3.29 7 12 12 20.71 7\" /> <path d=\"m7.5 4.27 9 5.15\" />", "play": "<path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\" />", "server": "<rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\" /> <rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\" /> <line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\" /> <line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\" />", "sparkles": "<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />", "trash-2": "<path d=\"M10 11v6\" /> <path d=\"M14 11v6\" /> <path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /> <path d=\"M3 6h18\" /> <path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />", "triangle-alert": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /> <path d=\"M12 9v4\" /> <path d=\"M12 17h.01\" />", "upload": "<path d=\"M12 3v12\" /> <path d=\"m17 8-5-5-5 5\" /> <path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />"};
+/* ---------- shared animation engine (deterministic: every frame is a pure function of T) ---------- */
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('flow');
+const RECORD=/[?&]record\b/.test(location.search);
+if(RECORD)document.documentElement.classList.add('record');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let AMB=0, cur=-1, T=0;
+
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in (attrs||{}))e.setAttribute(k,attrs[k]);(parent||svg).appendChild(e);return e}
+function grp(parent){return el('g',{},parent)}
+function txt(x,y,s,cls,parent,anchor){const t=el('text',{x,y,class:cls||'t-sub','text-anchor':anchor||'start'},parent);t.textContent=s;return t}
+function box(x,y,w,h,cls,parent,rx){return el('rect',{x,y,width:w,height:h,rx:rx==null?12:rx,class:cls},parent)}
+function icon(name,x,y,size,color,parent){
+  const g=el('g',{transform:`translate(${x} ${y}) scale(${size/24})`,class:'ic'},parent);
+  g.style.color=color||'var(--ink)';g.innerHTML=ICONS[name]||'';return g}
+function iconDisc(name,cx,cy,r,color,bg,parent){
+  const g=grp(parent);el('circle',{cx,cy,r,style:`fill:${bg}`},g);
+  icon(name,cx-r*.58,cy-r*.58,r*1.16,color,g);return g}
+
+/* a rounded pill sized to its measured label; returns {g,r,t,w} */
+function pill(parent,x,y,h,label,rc,tc,o){o=o||{};const g=grp(parent);const r=box(x,y,10,h,rc,g,o.rx==null?h/2:o.rx);
+  const pad=o.pad==null?16:o.pad,ic=o.icon?h*.62:0,gap=o.icon?8:0;
+  if(o.icon)icon(o.icon,x+pad-2,y+(h-ic)/2,ic,o.icol||'var(--muted)',g);
+  const t=txt(x+pad+ic+gap,y+h/2+(o.dy==null?7:o.dy),label,tc,g);if(o.fill)t.style.fill=o.fill;
+  const w=Math.ceil(pad+ic+gap+t.getComputedTextLength()+pad);r.setAttribute('width',w);return {g,r,t,w}}
+/* lay pills (made at x=0) out in a row ending at xr */
+function rowRight(items,xr,gap){let x=xr;for(let i=items.length-1;i>=0;i--){x-=items[i].w;items[i].g.setAttribute('transform',`translate(${x} 0)`);items[i].x=x;x-=gap}}
+
+/* timeline */
+const tweens=[];
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const eio=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+const lin=p=>p;
+const back=p=>{const c1=1.70158,c3=c1+1;return p<=0?0:1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const lerp=(a,b,p)=>a+(b-a)*p;
+function tw(t0,d,fn,o){o=o||{};tweens.push({t0,d,fn,mod:!!o.mod,ease:o.ease||eio})}
+function render(t){for(const w of tweens){if(w.mod&&t<w.t0)continue;const p=clamp((t-w.t0)/w.d);w.fn(w.ease(p),t,p)}}
+function always(fn){tw(0,1e9,(p,t)=>fn(t),{ease:lin})}
+const op=(e,v)=>{e.style.opacity=v};
+const G=.12;
+const ghostIn=(e,t0,d)=>tw(t0,d||.5,p=>op(e,G+(1-G)*p));
+const fadeIn=(e,t0,d)=>tw(t0,d||.4,p=>op(e,p));
+const fadeOut=(e,t0,d,to)=>tw(t0,d||.4,p=>op(e,lerp(1,to||0,p)),{mod:true});
+function pop(e,cx,cy,t0,d,from){from=from==null?G:from;
+  tw(t0,d||.55,(p,t,raw)=>{const s=raw<=0?1:lerp(.62,1,p);
+    e.setAttribute('transform',`translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})`);
+    op(e,raw<=0?from:from+(1-from)*clamp(raw*2.2))},{ease:back})}
+function moveTo(e,t0,d,x0,y0,x1,y1){tw(t0,d,(p)=>e.setAttribute('transform',`translate(${lerp(x0,x1,p)} ${lerp(y0,y1,p)})`))}
+function swapText(e,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.textContent!==v)e.textContent=v})}
+function swapAttr(e,attr,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.getAttribute(attr)!==v)e.setAttribute(attr,v)})}
+
+/* arrows: a faint ghost of the route, then the real stroke draws on */
+const MARK={wire:'ah','w-blue':'ah-b','w-red':'ah-r','w-green':'ah-g','w-amber':'ah-a','w-navy':'ah-n'};
+function arrow(d,t0,dur,parent,cls,opts){opts=opts||{};cls=cls||'wire';
+  const m=`url(#${MARK[cls]||'ah'})`;
+  const base=el('path',{d,class:cls+' ghostline','marker-end':opts.nohead?'':m},parent);
+  if(opts.noghost)op(base,0);
+  const p=el('path',{d,class:cls,pathLength:1,'stroke-dasharray':'1 1'},parent);
+  tw(t0,dur||.5,q=>{p.style.strokeDashoffset=1-q;op(p,q>0?1:0);
+    if(q>.97&&!opts.nohead)p.setAttribute('marker-end',m);else p.removeAttribute('marker-end')});
+  return p}
+function packet(path,shape,t0,d,rev){const L=path.getTotalLength();op(shape,0);
+  tw(t0,d||.9,(p,t,raw)=>{if(raw<=0||raw>=1){op(shape,0);return}
+    const q=rev?1-p:p;const pt=path.getPointAtLength(q*L);op(shape,1);
+    shape.setAttribute('transform',`translate(${pt.x} ${pt.y})`)})}
+function hiddenPath(d){const p=el('path',{d,fill:'none',stroke:'none'});return p}
+/* outline on the box that is the focus of the current step: pulses live, holds steady in a recording
+   (each recorded step ends on a frozen frame, so a pulse would freeze mid-ring) */
+function glowStep(b,idx,color,rx){
+  const g=el('rect',{x:b.x,y:b.y,width:b.w,height:b.h,rx:rx||16,class:'glow'});if(color)g.style.stroke=color;op(g,0);
+  always(t=>{if(cur!==idx){op(g,0);return}
+    if(RECORD){const k=0;   /* on the card's own outline, so it reads as one thicker border */
+      g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);
+      op(g,.9*clamp((t-PH[idx][0])/.35));return}
+    const ph=(AMB%1.4)/1.4,k=ph*9;
+    g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);op(g,.6*(1-ph))});
+  return g}
+/* mouse pointer used to show clicks */
+function pointer(parent){const g=grp(parent);
+  el('path',{d:'M0 0L0 22L6 17L10 26L14 24L10 15L18 15Z',class:'ptr'},g);op(g,0);return g}
+function clickPulse(cx,cy,t0,parent){const c=el('circle',{cx,cy,r:4,class:'clickring'},parent);op(c,0);
+  tw(t0,.55,(p,t,raw)=>{if(raw<=0||raw>=1){op(c,0);return}c.setAttribute('r',4+22*p);op(c,.8*(1-p))},{ease:lin})}
+
+/* defs: arrowheads in each wire colour */
+const defs=el('defs');
+[['ah','var(--wire)'],['ah-b','var(--blue)'],['ah-r','var(--red)'],['ah-g','var(--green)'],['ah-a','var(--amber)'],['ah-n','var(--navy)']].forEach(([id,c])=>{
+  const mk=el('marker',{id,viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);
+  el('path',{d:'M0 0L10 5L0 10z',style:`fill:${c}`},mk)});
+
+/* Scene E: the life of one recording, drawn on MAGOR itself (viewBox 1200 x 714).
+   Same ten steps and step times as scene A, so every recorded clip keeps its length.
+   Layout: the user's browser (left), MAGOR Studio with MongoDB and storage (middle),
+   SpeechLab outside MAGOR (right), the Admin Panel above and the runtime below. */
+const END=30;
+const RED='var(--red)', BLUE='var(--blue)', AMBR='var(--amber)', GRN='var(--green)';
+
+/* ---------- small drawing helpers ---------- */
+function stroke(e,c,w){e.style.stroke=c;if(w)e.style.strokeWidth=w}
+function at(t,fn){tw(t,.01,(p,T,raw)=>fn(raw>=1),{ease:lin})}           // flips state at time t
+function goRed(e,t){at(t,on=>{e.style.stroke=on?RED:'';e.style.strokeWidth=on?'2.4px':''})}
+function disc(cx,cy,r,ic,col,bg,parent){return iconDisc(ic,cx,cy,r,col,bg,parent)}
+function mark(cx,cy,kind,t0,parent){       // round verdict badge: ok / bad / amber question
+  const g=grp(parent);const C={ok:[GRN,'var(--green-bg)','circle-check'],bad:[RED,'var(--red-bg)','circle-x']}[kind];
+  el('circle',{cx,cy,r:17,style:`fill:#fff;stroke:${C[0]};stroke-width:2.4`},g);icon(C[2],cx-12,cy-12,24,C[0],g);
+  pop(g,cx,cy,t0,.45,0);return g}
+function fileGlyph(x,y,ic,parent){        // a document with a folded corner and an icon on it
+  const g=grp(parent);
+  const f=el('path',{d:`M${x} ${y}h28l10 10v32a3 3 0 0 1-3 3h-35a3 3 0 0 1-3-3v-39a3 3 0 0 1 3-3z`,style:'fill:#fff;stroke:var(--wire);stroke-width:1.6'},g);
+  el('path',{d:`M${x+28} ${y}v10h10`,style:'fill:none;stroke:var(--wire);stroke-width:1.6'},g);
+  icon(ic,x+6,y+16,24,'var(--blue)',g);return {g,f}}
+function filePacket(){const g=grp();el('rect',{x:-16,y:-12,width:32,height:24,rx:5,style:'fill:var(--blue-m)'},g);
+  el('path',{d:'M-4 -6L6 0L-4 6Z',style:'fill:#fff'},g);return g}
+function docPacket(col){const g=grp();el('rect',{x:-11,y:-14,width:22,height:28,rx:3,style:`fill:#fff;stroke:${col||BLUE};stroke-width:2`},g);
+  [-6,0,6].forEach(y=>el('rect',{x:-6,y:y-1,width:12,height:2.4,rx:1,style:`fill:${col||BLUE}`},g));return g}
+function wavePacket(){const g=grp();[10,20,14,24,12].forEach((h,i)=>el('rect',{x:-13+i*6,y:-h/2,width:3.6,height:h,rx:1.8,style:'fill:var(--blue-m)'},g));return g}
+/* change a pill's font size and resize the pill around it, so the text stays centered */
+function refit(p,fs,pad){p.t.style.fontSize=fs;const w=Math.ceil(2*pad+p.t.getComputedTextLength());p.r.setAttribute('width',w);p.w=w}
+function dotPacket(col){return el('circle',{r:7,style:`fill:${col||'var(--blue-m)'}`})}
+
+/* ---------- the bands under and over every stage ---------- */
+function band(y,ic,cap,sub){const g=grp();const r=box(20,y,1160,72,'card',g,16);
+  iconDisc(ic,58,y+36,25,'var(--blue)','var(--blue-bg)',g);
+  txt(96,y+29,cap,'t-cap',g);const s=txt(96,y+58,sub,'t-sub',g);op(g,G);return {g,r,s}}
+const admin=band(10,'layout-dashboard','ADMIN PANEL','manages users, recordings and ASR jobs');
+const apChips=['Users','Recordings','ASR Requests','Statistics'].map(s=>pill(admin.g,0,28,36,s,'chip','t-chip',{fill:'var(--muted)'}));
+rowRight(apChips,1164,10);
+
+/* runtime: three services standing on one Node.js slab */
+const rt=grp();op(rt,G);
+const rtCard=box(20,624,1160,72,'card',rt,16);
+iconDisc('package',58,660,25,'var(--blue)','var(--blue-bg)',rt);
+txt(96,653,'RUNTIME','t-cap',rt);const rtSub=txt(96,682,'under all three services','t-sub',rt);
+const svcs=['Frontend','Backend','Studio'].map((s,i)=>{const x=486+i*232;const r=box(x,634,216,26,'card-soft',rt,6);
+  const t=txt(x+108,654,s,'t-chip',rt,'middle');t.style.fontSize='19px';return r});
+const slab=box(478,664,688,24,'',rt,6);slab.style.fill='var(--navy)';
+const slabT=txt(822,682,'Node.js 16 · Node.js 18 · Node.js 18','t-chip',rt,'middle');slabT.style.fill='#fff';slabT.style.fontSize='18px';
+
+/* ---------- MAGOR in the user's browser ---------- */
+const BR={x:20,y:100,w:430,h:456};
+const brG=grp();
+const brFrame=box(BR.x,BR.y,BR.w,BR.h,'card',brG,16);
+el('path',{d:`M${BR.x} ${BR.y+42}V${BR.y+16}a16 16 0 0 1 16-16h${BR.w-32}a16 16 0 0 1 16 16V${BR.y+42}Z`,style:'fill:var(--pale)'},brG);
+el('line',{x1:BR.x,y1:BR.y+42,x2:BR.x+BR.w,y2:BR.y+42,style:'stroke:var(--line);stroke-width:1.6'},brG);
+[42,60,78].forEach((x,i)=>el('circle',{cx:x,cy:121,r:6,style:`fill:${['#F28B82','#FDD663','#81C995'][i]}`},brG));
+{const u=box(96,108,342,26,'',brG,13);u.style.fill='#fff';icon('monitor',106,112,18,'var(--muted)',brG);
+  const t=txt(132,128,'MAGOR Frontend, in the browser','t-chip',brG);t.style.fontSize='18px';t.style.fill='var(--muted)'}
+ghostIn(brG,.05,.45);
+
+/* ---------- MAGOR Studio, MongoDB and storage ---------- */
+const ST={x:540,y:112,w:240,h:180};
+const stG=grp();box(ST.x,ST.y,ST.w,ST.h,'card',stG,16);
+disc(ST.x+38,ST.y+38,24,'server',BLUE,'var(--blue-bg)',stG);
+{const t=txt(ST.x+72,ST.y+46,'MAGOR Studio','t-title',stG);t.style.fontSize='23.5px'}
+const leds=[];
+[0,1,2].forEach(i=>{const y=ST.y+82+i*30;box(ST.x+20,y,200,22,'chip',stG,6);
+  [0,1,2,3].forEach(k=>el('rect',{x:ST.x+32+k*12,y:y+6,width:6,height:10,rx:2,style:'fill:var(--line)'},stG));
+  const l=el('circle',{cx:ST.x+204,cy:y+11,r:5,style:'fill:var(--line)'},stG);leds.push(l)});
+ghostIn(stG,.3,.45);
+function blink(t){leds.forEach((l,i)=>at(t+i*.06,on=>{l.style.fill=on?'#34A853':'var(--line)'}))}
+
+const MG={cx:604,top:384,bot:528,rx:56,ry:12};
+const mgG=grp();
+el('path',{d:`M${MG.cx-MG.rx} ${MG.top}V${MG.bot}a${MG.rx} ${MG.ry} 0 0 0 ${2*MG.rx} 0V${MG.top}`,style:'fill:#fff;stroke:var(--wire);stroke-width:1.8'},mgG);
+el('ellipse',{cx:MG.cx,cy:MG.top,rx:MG.rx,ry:MG.ry,style:'fill:var(--pale);stroke:var(--wire);stroke-width:1.8'},mgG);
+{const t=txt(MG.cx,416,'MongoDB','t-chip',mgG,'middle');t.style.fontSize='18px';t.style.fill='var(--navy)'}
+ghostIn(mgG,.55,.45);
+function row(i,label){const g=grp();const y=426+i*26;const r=box(MG.cx-52,y,104,22,'chip-blue',g,6);
+  const t=txt(MG.cx,y+16,label,'t-mono-s',g,'middle');t.style.fontSize='17px';op(g,0);return {g,r,t,y}}
+const rows=[row(0,'recording'),row(1,'transcript'),row(2,'job')];
+
+const SG={x:678,y:372,w:112,h:168};
+const sgG=grp();
+el('path',{d:`M${SG.x} ${SG.y+14}V${SG.y+SG.h-8}a8 8 0 0 0 8 8h${SG.w-16}a8 8 0 0 0 8-8V${SG.y+22}a8 8 0 0 0-8-8H${SG.x+50}l-10-14H${SG.x+8}a8 8 0 0 0-8 8z`,style:'fill:#fff;stroke:var(--wire);stroke-width:1.8'},sgG);
+{const t=txt(SG.x+SG.w/2,404,'Storage','t-chip',sgG,'middle');t.style.fontSize='18px';t.style.fill='var(--navy)'}
+ghostIn(sgG,.6,.45);
+const files=[['file-video',0,0],['play',1,0],['file-text',0,1],['captions',1,1]].map(([ic,c,r])=>{
+  const f=fileGlyph(SG.x+10+c*52,414+r*48,ic,sgG);op(f.g,0);return f});
+
+/* ---------- SpeechLab, outside MAGOR ---------- */
+const SL={x:850,y:100,w:330,h:456};
+const slG=grp();box(SL.x,SL.y,SL.w,SL.h,'card-ext',slG,18);
+icon('cloud',SL.x+20,SL.y+18,30,'var(--muted)',slG);
+{const t=txt(SL.x+60,SL.y+42,'SpeechLab, NTU','t-title',slG);t.style.fontSize='23.5px';t.style.fill='var(--dark)'}
+{const t=txt(SL.x+60,SL.y+70,'outside MAGOR','t-sub',slG);t.style.fontSize='18px'}
+ghostIn(slG,.8,.45);
+function svcNode(y,ic,title,sub,parent){const g=grp(parent);const r=box(SL.x+20,y,SL.w-40,104,'card',g,14);
+  disc(SL.x+60,y+40,24,ic,BLUE,'var(--blue-bg)',g);const t=txt(SL.x+96,y+48,title,'t-title',g);t.style.fontSize='23px';
+  txt(SL.x+40,y+86,sub,'t-sub',g).style.fontSize='19px';return {g,r,x:SL.x+20,y,w:SL.w-40,h:104}}
+const asr=svcNode(186,'audio-lines','ASR service','speech to text',slG);
+const llm=svcNode(412,'sparkles','Language model','what Ask AI needs',slG);
+op(llm.g,.45);
+
+/* ---------- routes (faint until used) ---------- */
+const P_UP='M450 196L540 196', P_DOWN='M540 262L450 262';
+const P_ASR='M780 196L870 196', P_BACK='M870 258L780 258';
+const P_MG='M604 292L604 372', P_SG='M734 292L734 372';
+const P_AI='M780 280C826 280 826 464 870 464';
+
+/* =============== 1 upload =============== */
+const dlg=grp();
+box(64,196,342,176,'card',dlg,14);
+disc(106,238,24,'upload',BLUE,'var(--blue-bg)',dlg);
+{const t=txt(142,247,'Upload Media','t-title',dlg);t.style.fontSize='24px'}
+el('rect',{x:84,y:282,width:302,height:70,rx:10,style:'fill:var(--soft);stroke:var(--blue-line);stroke-width:1.8;stroke-dasharray:7 6'},dlg);
+const fchip=pill(dlg,0,0,40,'lecture.mp4','chip-blue','t-mono-s',{icon:'file-video',icol:BLUE,pad:12,dy:6});
+tw(1.9,.6,p=>{fchip.g.setAttribute('transform',`translate(${lerp(110,235-fchip.w/2,p)} 297)`);op(fchip.g,p)});
+op(dlg,0);fadeIn(dlg,1.55,.35);
+const aUp=arrow(P_UP,2.45,.4,null,'w-blue');
+packet(aUp,filePacket(),2.5,.6);
+blink(3.1);
+const aMg=arrow(P_MG,3.15,.3,null,'wire'),aSg=arrow(P_SG,3.15,.3,null,'wire');
+packet(aMg,dotPacket(),3.2,.4);packet(aSg,filePacket(),3.2,.4);
+fadeIn(rows[0].g,3.6,.3);[0,1].forEach((k,i)=>fadeIn(files[k].g,3.6+i*.15,.3));
+mark(495,164,'ok',3.75);
+glowStep({x:ST.x,y:ST.y,w:ST.w,h:ST.h},1);
+
+/* =============== 2 transcribe =============== */
+const aAsr=arrow(P_ASR,4.2,.4,null,'w-blue');
+packet(aAsr,wavePacket(),4.3,.8);
+{const sw=el('rect',{x:asr.x,y:asr.y,width:26,height:asr.h,rx:6,style:'fill:var(--blue-m)'},asr.g);op(sw,0);
+  tw(5.15,.8,(p,T,raw)=>{sw.setAttribute('x',asr.x+p*(asr.w-26));op(sw,raw>0&&raw<1?.3:0)},{ease:lin})}
+const aBack=arrow(P_BACK,5.9,.4,null,'w-blue');
+packet(aBack,docPacket(),6.0,.6);
+blink(6.55);
+packet(aMg,dotPacket(),6.6,.4);packet(aSg,docPacket(),6.6,.4);
+[1,2].forEach((k,i)=>fadeIn(rows[k].g,7.0+i*.12,.3));[2,3].forEach((k,i)=>fadeIn(files[k].g,7.0+i*.15,.3));
+mark(825,227,'ok',7.15);
+glowStep(asr,2);
+
+/* =============== 3 review and edit: the Studio page, as it was =============== */
+fadeOut(dlg,7.55,.3);
+const aDown=arrow(P_DOWN,7.6,.4,null,'w-blue');
+packet(aDown,docPacket(),7.7,.55);
+const pg=grp();op(pg,0);fadeIn(pg,8.1,.4);
+/* player, with captions in its lower edge */
+box(32,152,210,146,'',pg,8).style.fill='#202124';
+el('path',{d:'M128 196L150 210L128 224Z',style:'fill:#fff;opacity:.85'},pg);
+box(44,284,186,5,'',pg,2.5).style.fill='#5F6368';
+const played=box(44,284,0,5,'',pg,2.5);played.style.fill='var(--blue-m)';
+const head=el('circle',{cx:44,cy:286.5,r:6,style:'fill:#fff'},pg);
+tw(8.4,2.4,p=>{played.setAttribute('width',186*p);head.setAttribute('cx',44+186*p)},{ease:lin});
+const cap0=box(62,254,150,12,'',pg,4);cap0.style.fill='#fff';
+const stale=[238,222].map((y,i)=>{const r=box(62,y,i?110:150,12,'',pg,4);r.style.fill='#F28B82';op(r,0);fadeIn(r,8.9+i*.4,.25);return r});
+const ooS=pill(pg,40,160,30,'out of sync','chip-solid-red','t-chip',{fill:'#fff',pad:11,dy:6.5});refit(ooS,'17px',11);
+op(ooS.g,0);pop(ooS.g,95,175,9.6,.4,0);
+/* metadata, tags, top words and filters, all above the transcript */
+const meta=grp(pg);
+box(252,152,188,146,'card-soft',meta,8);
+{const t=txt(346,177,'tags · words · filters','t-sub',meta,'middle');t.style.fontSize='16.5px'}
+[[262,196,48],[316,196,40],[362,196,58]].forEach(([x,y,w])=>box(x,y,w,18,'chip-blue',meta,9));
+[[262,222,38],[306,222,52],[364,222,34],[404,222,30]].forEach(([x,y,w])=>box(x,y,w,18,'chip',meta,9).style.fill='var(--line)');
+[[262,250,80],[350,250,80]].forEach(([x,y,w])=>{const r=box(x,y,w,26,'',meta,6);r.style.fill='#fff';r.style.stroke='var(--line)';r.style.strokeWidth='1.4'});
+const metaBox=meta.firstChild;
+/* the transcript: one line visible */
+const trBox=box(32,308,408,44,'card-soft',pg,8);
+{const t=txt(44,337,'Transcript','t-sub',pg);t.style.fontSize='19px'}
+box(150,322,90,16,'',pg,4).style.fill='var(--blue-line)';
+const one=pill(pg,0,315,30,'not enough room','chip-solid-red','t-chip',{fill:'#fff',pad:11,dy:6.5});refit(one,'17px',11);
+one.g.setAttribute('transform',`translate(${434-one.w} 0)`);{const w=grp(pg);w.appendChild(one.g);op(w,0);pop(w,434-one.w/2,330,9.85,.4,0)}
+/* the recording's own toolbar: download and delete */
+const tb=grp(pg);
+const tbBox=box(32,508,408,40,'card-soft',tb,8);
+icon('file-video',44,516,24,'var(--muted)',tb);
+const tbName=txt(76,534,'lecture.mp4','t-mono-s',tb);tbName.style.fontSize='18px';
+const bDl=grp(tb);box(356,512,36,32,'',bDl,8).style.fill='#fff';icon('download',362,516,24,'var(--ink)',bDl);
+const bDel=grp(tb);box(400,512,36,32,'',bDel,8).style.fill='#fff';icon('trash-2',406,516,24,'var(--ink)',bDel);
+[bDl,bDel].forEach(b=>{b.firstChild.style.stroke='var(--line)';b.firstChild.style.strokeWidth='1.4'});
+op(tb,0);fadeIn(tb,11.0,.3);   /* the toolbar arrives with the Export step, just before its Download is clicked */
+at(9.7,on=>{metaBox.setAttribute('class',on?'card-red':'card-soft');trBox.setAttribute('class',on?'card-red':'card-soft')});
+goRed(brFrame,9.9);
+glowStep(BR,3,RED);
+
+/* =============== 4 export =============== */
+function xBadge(cx,cy,parent){const g=grp(parent);el('circle',{cx,cy,r:12,style:'fill:#fff'},g);icon('circle-x',cx-12,cy-12,24,RED,g);return g}
+clickPulse(374,528,11.35);
+const shelf=grp();op(shelf,0);fadeIn(shelf,11.5,.3);
+const shBox=box(32,446,408,52,'card-soft',shelf,10);
+/* two rows, one problem each: transcripts came out as XML only, and the recording itself had no download */
+function noteX(x,cy,label,parent,t0){const g=grp(parent);xBadge(x+12,cy,g);
+  const t=txt(x+30,cy+6,label,'t-prob',g);t.style.fontSize='17.5px';op(g,0);fadeIn(g,t0,.3);return g}
+{let x=44;const y=454;
+  const a=pill(shelf,x,y,36,'XML','chip-blue','t-chip',{fill:BLUE});refit(a,'17px',14);op(a.g,0);fadeIn(a.g,11.65,.3);x+=a.w+10;
+  const b=pill(shelf,x,y,36,'other formats','chip','t-chip',{fill:'var(--wire)'});refit(b,'17px',14);
+  b.r.style.fill='#fff';b.r.style.stroke='var(--line)';b.r.style.strokeWidth='1.6';b.r.style.strokeDasharray='6 5';
+  op(b.g,0);fadeIn(b.g,11.95,.3);x+=b.w+12;
+  noteX(x,y+18,'XML only',shelf,12.25)}
+noteX(tbName.getComputedTextLength()+86,528,'no download',tb,12.5);
+at(12.7,on=>{shBox.setAttribute('class',on?'card-red':'card-soft');tbBox.setAttribute('class',on?'card-red':'card-soft')});
+glowStep({x:32,y:446,w:408,h:102},4,RED,10);
+
+/* =============== 5 work with it: no AI yet =============== */
+const ai=grp();op(ai,0);fadeIn(ai,14.7,.35);
+box(32,364,408,70,'card-amber',ai,10);
+icon('sparkles',44,384,28,AMBR,ai);
+{const t=txt(80,406,'Ask AI','t-amb',ai);t.style.fontSize='20px'}
+{let x=160;['summary?','question?'].forEach((s,i)=>{const q=pill(ai,x,382,34,s,'card-amber','t-amb',{pad:12,dy:6.5});refit(q,'18px',12);
+  op(q.g,0);fadeIn(q.g,15.1+i*.2,.3);x+=q.w+10})}
+const aiRoute=el('path',{d:P_AI,class:'w-amber dash ghostline'});
+const aiPart=arrow('M780 280C808 280 816 330 818 364',15.4,.5,null,'w-amber',{nohead:true,noghost:true});
+{const g=grp();el('circle',{cx:818,cy:382,r:16,style:'fill:var(--amber-bg);stroke:var(--amber);stroke-width:2.2'},g);
+  const t=txt(818,390,'?','t-amb',g,'middle');t.style.fontSize='22px';pop(g,818,382,15.9,.4,0)}
+at(15.9,on=>{llm.r.setAttribute('class',on?'card-amber':'card');op(llm.g,on?1:.45)});
+glowStep({x:32,y:364,w:408,h:70},5,AMBR,10);
+
+/* =============== 6 delete: one record goes, the rest stays =============== */
+clickPulse(418,528,17.65);
+packet(aUp,dotPacket('var(--red)'),17.85,.5);
+blink(18.35);
+packet(aMg,dotPacket('var(--red)'),18.4,.4);
+{const r=rows[0];const k=el('line',{x1:MG.cx-48,y1:r.y+11,x2:MG.cx-48,y2:r.y+11,style:'stroke:var(--dark);stroke-width:2.6'},r.g);
+  tw(18.8,.35,p=>{k.setAttribute('x2',MG.cx-48+96*p)});tw(19.0,.35,p=>op(r.g,1-.7*p),{mod:true})}
+rows.slice(1).forEach((r,i)=>at(19.3+i*.12,on=>{r.r.setAttribute('class',on?'chip-wr':'chip-blue');r.t.style.fill=on?RED:''}));
+files.forEach((f,i)=>at(19.35+i*.1,on=>{f.f.style.stroke=on?RED:'var(--wire)';f.f.style.fill=on?'var(--red-bg)':'#fff'}));
+{const lb=pill(null,0,0,32,'left behind','chip-solid-red','t-chip',{fill:'#fff',pad:12,dy:6.5});refit(lb,'17px',12);
+  lb.g.setAttribute('transform',`translate(${697-lb.w/2} 512)`);const w=grp();svg.appendChild(w);w.appendChild(lb.g);op(w,0);fadeIn(w,19.75,.3)}
+glowStep({x:540,y:364,w:258,h:184},6,RED);
+
+/* =============== 7 the admin panel =============== */
+ghostIn(admin.g,21.0,.4);
+swapAttr(admin.r,'class',[[0,'card'],[21.4,'card-red']]);
+apChips.forEach((p,i)=>tw(21.5+i*.25,.3,q=>{p.r.setAttribute('class',q>.5?'chip-wr':'chip');p.t.style.fill=q>.5?RED:'var(--muted)'}));
+glowStep({x:20,y:10,w:1160,h:72},7,RED);
+
+/* =============== 8 the runtime =============== */
+ghostIn(rt,24.0,.4);
+at(24.4,on=>{rtCard.setAttribute('class',on?'card-red':'card');slab.style.fill=on?RED:'var(--navy)';
+  rtSub.textContent=on?'end of life: no security patches':'under all three services';
+  svcs.forEach(r=>{r.style.stroke=on?RED:'';r.style.strokeWidth=on?'2px':''})});
+glowStep({x:20,y:624,w:1160,h:72},8,RED);
+
+/* =============== 9 the picture =============== */
+const ban=grp();box(290,566,620,44,'card-red',ban,22);
+const bt=txt(0,596,'Problems at every stage after transcription','t-title',ban);
+bt.style.fill=RED;bt.style.fontSize='23px';
+{const w=bt.getComputedTextLength(),x0=600-(w+34)/2;icon('triangle-alert',x0,576,24,RED,ban);bt.setAttribute('x',x0+34)}
+pop(ban,600,588,27.0,.5,0);
+
+const PH=[
+  [0,'One recording’s life','in','Follow one recording through MAGOR, from upload to deletion.'],
+  [1.5,'Upload','life','Audio or video is uploaded into MAGOR Studio. This worked.','ok',3.75],
+  [4.0,'Transcribe','life','Studio sends it to the SpeechLab ASR service. This worked too.','ok',7.15],
+  [7.5,'Review and edit','life','Captions did not keep in step with playback, and the page layout left little room for the transcript.','bad',9.6],
+  [11.0,'Export','life','Transcripts came out only as raw XML, and your own recording couldn’t be downloaded.','bad',12.3],
+  [14.5,'Work with it','life','No way to summarize or question a transcript. This is where AI comes in.','amb',15.9],
+  [17.5,'Delete','life','Deleting removed one record and left the recording’s files and records behind.','bad',19.4],
+  [21.0,'Administer','under','All four Admin Panel pages had issues that kept them from working properly.','bad',21.5],
+  [24.0,'Runtime','under','Every service ran an end-of-life Node.js release, with no more security patches.','bad',24.4],
+  [27.0,'The picture','sum','Problems at every stage after transcription.']
+];
+const GRP={in:'Start',life:'A recording’s life',under:'Under every stage',sum:'So'};
+
+/* ---------- step player: one step at a time, earlier steps resolve instantly ---------- */
+const list=document.getElementById('steplist');
+let html='',lastG='';
+PH.forEach(([t,title,g,d],i)=>{if(g!==lastG){html+=`<li class="grp-h ${g}">${GRP[g]}</li>`;lastG=g}
+  const mk=PH[i][4]?`<svg class="mk mk-${PH[i][4]}" viewBox="0 0 24 24">${ICONS[{ok:'circle-check',bad:'circle-x',amb:'circle-dashed'}[PH[i][4]]]||''}</svg>`:'';
+  html+=`<li><button class="step" data-i="${i}"><span class="n">${String(i+1).padStart(2,'0')}</span><span class="t">${title}</span><span class="d">${d}</span>${mk}<span class="bar"></span></button></li>`});
+list.innerHTML=html;
+const stepEls=[...list.querySelectorAll('.step')];
+const countEl=document.getElementById('count');
+const endOf=i=>i<PH.length-1?PH[i+1][0]:END;
+let playing=false,stopAt=0,all=false,last=0;
+function update(){
+  stepEls.forEach((b,i)=>{
+    b.classList.toggle('on',i===cur);b.classList.toggle('done',i<cur);
+    b.setAttribute('aria-current',i===cur?'step':'false');
+    const prog=i===cur?clamp((T-PH[i][0])/(endOf(i)-PH[i][0])):i<cur?1:0;
+    b.querySelector('.bar').style.transform=`scaleX(${i===cur?prog:0})`;
+    const mk=b.querySelector('.mk');   /* verdict mark: appears with the step's own verdict, stays after */
+    if(mk)mk.style.opacity=i<cur?1:i===cur?clamp((T-(PH[i][5]==null?PH[i][0]:PH[i][5]))/.3):0;
+  });
+  if(countEl)countEl.textContent=`${String(Math.max(cur,0)+1).padStart(2,'0')} / ${String(PH.length).padStart(2,'0')}`;
+  const pv=document.getElementById('prev'),nx=document.getElementById('next');
+  if(pv)pv.disabled=cur<=0; if(nx)nx.disabled=cur>=PH.length-1;
+}
+function select(i){cur=clamp(i,0,PH.length-1);all=false;T=PH[cur][0];stopAt=endOf(cur);playing=true;
+  if(reduce){T=stopAt;playing=false}update()}
+function frame(now){
+  const dt=last?Math.min(.25,(now-last)/1000):0;last=now;AMB+=dt;
+  if(playing){T+=dt;
+    if(all){let k=0;PH.forEach(([t],i)=>{if(T>=t)k=i});cur=k}
+    if(T>=stopAt){T=stopAt;playing=false}
+    update()}
+  render(T);requestAnimationFrame(frame)}
+stepEls.forEach(b=>b.onclick=()=>select(+b.dataset.i));
+document.getElementById('prev').onclick=()=>select(cur-1);
+document.getElementById('next').onclick=()=>select(cur+1);
+document.getElementById('again').onclick=()=>select(Math.max(cur,0));
+document.getElementById('all').onclick=()=>{cur=0;T=0;stopAt=END;all=true;playing=true;
+  if(reduce){T=END;cur=PH.length-1;playing=false}update()};
+document.addEventListener('keydown',e=>{
+  if(e.altKey||e.ctrlKey||e.metaKey)return;
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();select(cur+1)}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();select(cur-1)}
+  else if(e.key===' '&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();select(Math.max(cur,0))}
+  else if(e.key==='Home'){e.preventDefault();select(0)}
+});
+/* hooks for the frame-by-frame recorder */
+window.__meta=()=>({steps:PH.map(p=>p[0]),end:END});
+window.__frame=(t,amb,c)=>{T=t;AMB=amb;cur=c;playing=false;update();render(T)};
+/* fit the 1920x1080 stage to any window */
+const stage=document.getElementById('stage');
+function fit(){if(RECORD)return;const s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`translate(-50%,-50%) scale(${s})`}
+addEventListener('resize',fit);fit();
+cur=0;update();render(T);
+if(!RECORD)requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Why not just let the page scroll?</title>
+<style>
+:root{
+  --bg:#F5F7FA; --panel:#FFFFFF; --ink:#202124; --navy:#0B1F3A; --muted:#5F6368; --wire:#9AA0A6;
+  --line:#DADCE0; --pale:#F1F3F4; --soft:#F8F9FA;
+  --blue:#1967D2; --blue-m:#4285F4; --blue-bg:#E8F0FE; --blue-line:#AECBFA;
+  --red:#D93025; --red-bg:#FCE8E6; --green:#188038; --green-bg:#E6F4EA;
+  --amber:#B06000; --amber-bg:#FEF7E0; --dark:#3C4043;
+  --f:'Segoe UI',system-ui,-apple-system,sans-serif; --fs:'Segoe UI Semibold','Segoe UI',system-ui,sans-serif;
+  --mono:Consolas,'Cascadia Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
+body{font-family:var(--f);color:var(--ink)}
+
+/* live page: a 1920x1080 stage scaled to the window */
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center;
+  padding:30px 28px 22px;display:grid;grid-template-rows:auto 870px auto;gap:18px;align-content:center;background:var(--bg)}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:0 4px}
+.eyebrow{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:700;letter-spacing:.09em;color:var(--blue);text-transform:uppercase}
+.mark{display:inline-flex;align-items:center;gap:4px;height:20px}
+.mark i{display:block;width:4px;border-radius:2px;background:var(--blue-m)}
+h1{margin:6px 0 0;font:56px/1.1 var(--fs);color:var(--navy);letter-spacing:-.005em}
+.ctrl{display:flex;gap:10px;align-items:center;padding-bottom:6px}
+.kbd{font-size:17px;color:var(--muted);margin-right:8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;height:46px;padding:0 20px;font:inherit;font-size:18px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.go{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn:focus-visible,.step:focus-visible{outline:3px solid var(--blue);outline-offset:1px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 500px;gap:20px;min-height:0}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;min-width:0;display:flex}
+#flow{display:block;width:100%;height:100%}
+.steps{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px 14px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
+.steps-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 10px}
+.cap{font-size:17px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+#count{font:600 17px var(--mono);color:var(--blue)}
+#steplist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;flex:1;min-height:0}
+.grp-h{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--wire);padding:9px 12px 1px}
+.step{appearance:none;width:100%;text-align:left;font:inherit;color:var(--ink);background:none;border:1.5px solid transparent;border-radius:12px;
+  padding:6px 12px;cursor:pointer;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:4px;position:relative;overflow:hidden}
+.step .n{grid-row:1/3;font:20px var(--mono);color:var(--wire);padding-top:4px}
+.step .t{font:25px/1.3 var(--fs);color:var(--muted)}
+.step .d{display:none;font-size:23.5px;line-height:1.36;color:var(--ink);padding:3px 0 4px}
+.step:hover{background:var(--soft)}
+.step.done .n{color:var(--blue)}
+.step.done .t{color:var(--ink)}
+.step.on{background:var(--blue-bg);border-color:var(--blue-m)}
+.step.on .t{color:var(--navy)}
+.step.on .n{color:var(--blue)}
+.step.on .d{display:block}
+.step .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;background:var(--blue-m);transform-origin:left;transform:scaleX(0)}
+footer{display:flex;gap:28px;font-size:17px;color:var(--muted);padding:0 4px}
+footer .lg{display:inline-flex;align-items:center;gap:8px}
+footer .lg i{display:inline-block;width:22px;height:15px;border-radius:4px}
+
+/* record mode: just the 1864x800 board + steps, laid on a white slide */
+.record,.record body{background:#fff}
+.record .stage{left:0;top:0;transform:none!important;width:1864px;height:800px;padding:0;display:block;background:#fff}
+.record header,.record footer,.record .grp-h{display:none}
+.record .main{height:800px}
+
+/* svg */
+.card{fill:var(--panel);stroke:var(--line);stroke-width:1.6}
+.card-soft{fill:var(--soft);stroke:var(--line);stroke-width:1.4}
+.card-blue{fill:var(--blue-bg);stroke:var(--blue-m);stroke-width:2}
+.card-red{fill:var(--red-bg);stroke:var(--red);stroke-width:2}
+.card-green{fill:var(--green-bg);stroke:var(--green);stroke-width:2}
+.card-amber{fill:var(--amber-bg);stroke:var(--amber);stroke-width:2;stroke-dasharray:8 6}
+.card-ext{fill:var(--soft);stroke:var(--wire);stroke-width:1.8;stroke-dasharray:8 6}
+.chip{fill:var(--pale);stroke:none}
+.chip-blue{fill:var(--blue-bg)} .chip-red{fill:var(--red-bg)} .chip-green{fill:var(--green-bg)} .chip-amber{fill:var(--amber-bg)}
+.chip-wr{fill:#fff;stroke:var(--red);stroke-width:1.6} .chip-wg{fill:#fff;stroke:var(--green);stroke-width:1.6}
+.chip-solid-blue{fill:var(--blue-m)} .chip-solid-red{fill:var(--red)} .chip-solid-green{fill:var(--green)} .chip-solid-navy{fill:var(--navy)}
+.wire{fill:none;stroke:var(--wire);stroke-width:2.6}
+.w-blue{fill:none;stroke:var(--blue);stroke-width:2.8} .w-red{fill:none;stroke:var(--red);stroke-width:2.8}
+.w-green{fill:none;stroke:var(--green);stroke-width:2.8} .w-amber{fill:none;stroke:var(--amber);stroke-width:2.8}
+.w-navy{fill:none;stroke:var(--navy);stroke-width:2.8}
+.ghostline{opacity:.14}
+.dash{stroke-dasharray:8 7}
+.glow{fill:none;stroke:var(--blue-m);stroke-width:3.2}
+.ic *{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.t-title{font:27px var(--fs);fill:var(--navy)}
+.t-head{font:31px var(--fs);fill:var(--navy)}
+.t-sub{font:21.5px var(--f);fill:var(--muted)}
+.t-body{font:22px var(--f);fill:var(--ink)}
+.t-prob{font:21px var(--fs);fill:var(--red)}
+.t-ok{font:21px var(--fs);fill:var(--green)}
+.t-amb{font:21px var(--fs);fill:var(--amber)}
+.t-blue{font:21px var(--fs);fill:var(--blue)}
+.t-mono{font:21px var(--mono);fill:var(--ink)}
+.t-mono-s{font:19.5px var(--mono);fill:var(--ink)}
+.t-chip{font:19.5px var(--fs);fill:var(--ink)}
+.t-cap{font:700 18.5px var(--f);letter-spacing:.08em;fill:var(--muted)}
+.t-white{fill:#fff}
+.ptr{fill:var(--navy);stroke:#fff;stroke-width:1.8;stroke-linejoin:round}
+.clickring{fill:none;stroke:var(--blue-m);stroke-width:3.5}
+.dot{fill:var(--blue-m)}
+
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <header>
+    <div>
+      <div class="eyebrow"><span class="mark"><i style="height:9px"></i><i style="height:18px"></i><i style="height:12px"></i><i style="height:20px"></i><i style="height:10px"></i></span>03   Restoring the platform</div>
+      <h1>Why not just let the page scroll?</h1>
+    </div>
+    <div class="ctrl">
+      <span class="kbd">&larr; &rarr; step &middot; Space replay</span>
+      <button class="btn" id="prev">Back</button>
+      <button class="btn" id="again">Replay</button>
+      <button class="btn" id="next">Next</button>
+      <button class="btn go" id="all">Play all</button>
+    </div>
+  </header>
+  <div class="main">
+    <div class="board"><svg id="flow" viewBox="0 0 1200 714" role="img" aria-label="The old Recordings page is taller than the screen. When the user scrolls down, playback's auto-scroll snaps the page back to the segment being spoken."></svg></div>
+    <aside class="steps" aria-label="Steps">
+      <div class="steps-head"><span class="cap">Steps</span><span id="count"></span></div>
+      <ol id="steplist"></ol>
+    </aside>
+  </div>
+  <footer><span>Soh Zi Xiang &middot; CCDS25-1034 &middot; MAGOR</span><span class="lg"><i style="background:var(--amber-bg);border:2px solid var(--amber)"></i>segment being spoken</span><span class="lg"><i style="background:var(--red-bg);border:2px solid var(--red)"></i>page snapped back</span><span style="margin-left:auto">Source: FYP report, Section 4.3.6</span></footer>
+</div>
+<script>
+const ICONS={"arrow-up": "<path d=\"m5 12 7-7 7 7\" /> <path d=\"M12 19V5\" />", "circle": "<circle cx=\"12\" cy=\"12\" r=\"10\" />", "circle-check": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m16 9-5.5 5.5L8 12\" />", "circle-dashed": "<path d=\"M10.1 2.182a10 10 0 0 1 3.8 0\" /> <path d=\"M13.9 21.818a10 10 0 0 1-3.8 0\" /> <path d=\"M17.609 3.721a10 10 0 0 1 2.69 2.7\" /> <path d=\"M2.182 13.9a10 10 0 0 1 0-3.8\" /> <path d=\"M20.279 17.609a10 10 0 0 1-2.7 2.69\" /> <path d=\"M21.818 10.1a10 10 0 0 1 0 3.8\" /> <path d=\"M3.721 6.391a10 10 0 0 1 2.7-2.69\" /> <path d=\"M6.391 20.279a10 10 0 0 1-2.69-2.7\" />", "circle-play": "<path d=\"M9 9.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997A1 1 0 0 1 9 14.996z\" /> <circle cx=\"12\" cy=\"12\" r=\"10\" />", "circle-x": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"m15 9-6 6\" /> <path d=\"m9 9 6 6\" />", "mouse": "<rect x=\"5\" y=\"2\" width=\"14\" height=\"20\" rx=\"7\" /> <path d=\"M12 6v4\" />", "move-vertical": "<path d=\"M12 2v20\" /> <path d=\"m8 18 4 4 4-4\" /> <path d=\"m8 6 4-4 4 4\" />", "triangle-alert": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /> <path d=\"M12 9v4\" /> <path d=\"M12 17h.01\" />"};
+/* ---------- shared animation engine (deterministic: every frame is a pure function of T) ---------- */
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('flow');
+const RECORD=/[?&]record\b/.test(location.search);
+if(RECORD)document.documentElement.classList.add('record');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let AMB=0, cur=-1, T=0;
+
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in (attrs||{}))e.setAttribute(k,attrs[k]);(parent||svg).appendChild(e);return e}
+function grp(parent){return el('g',{},parent)}
+function txt(x,y,s,cls,parent,anchor){const t=el('text',{x,y,class:cls||'t-sub','text-anchor':anchor||'start'},parent);t.textContent=s;return t}
+function box(x,y,w,h,cls,parent,rx){return el('rect',{x,y,width:w,height:h,rx:rx==null?12:rx,class:cls},parent)}
+function icon(name,x,y,size,color,parent){
+  const g=el('g',{transform:`translate(${x} ${y}) scale(${size/24})`,class:'ic'},parent);
+  g.style.color=color||'var(--ink)';g.innerHTML=ICONS[name]||'';return g}
+function iconDisc(name,cx,cy,r,color,bg,parent){
+  const g=grp(parent);el('circle',{cx,cy,r,style:`fill:${bg}`},g);
+  icon(name,cx-r*.58,cy-r*.58,r*1.16,color,g);return g}
+
+/* a rounded pill sized to its measured label; returns {g,r,t,w} */
+function pill(parent,x,y,h,label,rc,tc,o){o=o||{};const g=grp(parent);const r=box(x,y,10,h,rc,g,o.rx==null?h/2:o.rx);
+  const pad=o.pad==null?16:o.pad,ic=o.icon?h*.62:0,gap=o.icon?8:0;
+  if(o.icon)icon(o.icon,x+pad-2,y+(h-ic)/2,ic,o.icol||'var(--muted)',g);
+  const t=txt(x+pad+ic+gap,y+h/2+(o.dy==null?7:o.dy),label,tc,g);if(o.fill)t.style.fill=o.fill;
+  const w=Math.ceil(pad+ic+gap+t.getComputedTextLength()+pad);r.setAttribute('width',w);return {g,r,t,w}}
+/* lay pills (made at x=0) out in a row ending at xr */
+function rowRight(items,xr,gap){let x=xr;for(let i=items.length-1;i>=0;i--){x-=items[i].w;items[i].g.setAttribute('transform',`translate(${x} 0)`);items[i].x=x;x-=gap}}
+
+/* timeline */
+const tweens=[];
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const eio=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+const lin=p=>p;
+const back=p=>{const c1=1.70158,c3=c1+1;return p<=0?0:1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const lerp=(a,b,p)=>a+(b-a)*p;
+function tw(t0,d,fn,o){o=o||{};tweens.push({t0,d,fn,mod:!!o.mod,ease:o.ease||eio})}
+function render(t){for(const w of tweens){if(w.mod&&t<w.t0)continue;const p=clamp((t-w.t0)/w.d);w.fn(w.ease(p),t,p)}}
+function always(fn){tw(0,1e9,(p,t)=>fn(t),{ease:lin})}
+const op=(e,v)=>{e.style.opacity=v};
+const G=.12;
+const ghostIn=(e,t0,d)=>tw(t0,d||.5,p=>op(e,G+(1-G)*p));
+const fadeIn=(e,t0,d)=>tw(t0,d||.4,p=>op(e,p));
+const fadeOut=(e,t0,d,to)=>tw(t0,d||.4,p=>op(e,lerp(1,to||0,p)),{mod:true});
+function pop(e,cx,cy,t0,d,from){from=from==null?G:from;
+  tw(t0,d||.55,(p,t,raw)=>{const s=raw<=0?1:lerp(.62,1,p);
+    e.setAttribute('transform',`translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})`);
+    op(e,raw<=0?from:from+(1-from)*clamp(raw*2.2))},{ease:back})}
+function moveTo(e,t0,d,x0,y0,x1,y1){tw(t0,d,(p)=>e.setAttribute('transform',`translate(${lerp(x0,x1,p)} ${lerp(y0,y1,p)})`))}
+function swapText(e,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.textContent!==v)e.textContent=v})}
+function swapAttr(e,attr,seq){always(t=>{let v=seq[0][1];for(const [a,s] of seq)if(t>=a)v=s;if(e.getAttribute(attr)!==v)e.setAttribute(attr,v)})}
+
+/* arrows: a faint ghost of the route, then the real stroke draws on */
+const MARK={wire:'ah','w-blue':'ah-b','w-red':'ah-r','w-green':'ah-g','w-amber':'ah-a','w-navy':'ah-n'};
+function arrow(d,t0,dur,parent,cls,opts){opts=opts||{};cls=cls||'wire';
+  const m=`url(#${MARK[cls]||'ah'})`;
+  const base=el('path',{d,class:cls+' ghostline','marker-end':opts.nohead?'':m},parent);
+  if(opts.noghost)op(base,0);
+  const p=el('path',{d,class:cls,pathLength:1,'stroke-dasharray':'1 1'},parent);
+  tw(t0,dur||.5,q=>{p.style.strokeDashoffset=1-q;op(p,q>0?1:0);
+    if(q>.97&&!opts.nohead)p.setAttribute('marker-end',m);else p.removeAttribute('marker-end')});
+  return p}
+function packet(path,shape,t0,d,rev){const L=path.getTotalLength();op(shape,0);
+  tw(t0,d||.9,(p,t,raw)=>{if(raw<=0||raw>=1){op(shape,0);return}
+    const q=rev?1-p:p;const pt=path.getPointAtLength(q*L);op(shape,1);
+    shape.setAttribute('transform',`translate(${pt.x} ${pt.y})`)})}
+function hiddenPath(d){const p=el('path',{d,fill:'none',stroke:'none'});return p}
+/* outline on the box that is the focus of the current step: pulses live, holds steady in a recording
+   (each recorded step ends on a frozen frame, so a pulse would freeze mid-ring) */
+function glowStep(b,idx,color,rx){
+  const g=el('rect',{x:b.x,y:b.y,width:b.w,height:b.h,rx:rx||16,class:'glow'});if(color)g.style.stroke=color;op(g,0);
+  always(t=>{if(cur!==idx){op(g,0);return}
+    if(RECORD){const k=0;   /* on the card's own outline, so it reads as one thicker border */
+      g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);
+      op(g,.9*clamp((t-PH[idx][0])/.35));return}
+    const ph=(AMB%1.4)/1.4,k=ph*9;
+    g.setAttribute('x',b.x-k);g.setAttribute('y',b.y-k);g.setAttribute('width',b.w+2*k);g.setAttribute('height',b.h+2*k);op(g,.6*(1-ph))});
+  return g}
+/* mouse pointer used to show clicks */
+function pointer(parent){const g=grp(parent);
+  el('path',{d:'M0 0L0 22L6 17L10 26L14 24L10 15L18 15Z',class:'ptr'},g);op(g,0);return g}
+function clickPulse(cx,cy,t0,parent){const c=el('circle',{cx,cy,r:4,class:'clickring'},parent);op(c,0);
+  tw(t0,.55,(p,t,raw)=>{if(raw<=0||raw>=1){op(c,0);return}c.setAttribute('r',4+22*p);op(c,.8*(1-p))},{ease:lin})}
+
+/* defs: arrowheads in each wire colour */
+const defs=el('defs');
+[['ah','var(--wire)'],['ah-b','var(--blue)'],['ah-r','var(--red)'],['ah-g','var(--green)'],['ah-a','var(--amber)'],['ah-n','var(--navy)']].forEach(([id,c])=>{
+  const mk=el('marker',{id,viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:6.5,markerHeight:6.5,orient:'auto-start-reverse'},defs);
+  el('path',{d:'M0 0L10 5L0 10z',style:`fill:${c}`},mk)});
+
+/* Scene D: why page scrolling was rejected. The old page is taller than the screen; the user
+scrolls down to read, and each time playback reaches a new segment the auto-scroll snaps the
+page back to it. (viewBox 1200 x 714) */
+const END=15.5;
+const VX=40,VY=24,VW=720,VH=560;          // the screen
+const SEG0=470,SEGH=74,NSEG=10;            // transcript segments in page coordinates
+const segMid=i=>SEG0+i*SEGH+SEGH/2;
+const centre=i=>segMid(i)-VH/2;            // scroll that centres segment i (scrollIntoView, block: centre)
+
+/* scroll offset and the segment being spoken, as pure functions of t */
+const SK=[[0,0],[2.4,0],[3.8,420],[5.8,420],[6.7,700],[7.6,700],[7.85,centre(4)],[9.3,centre(4)],[10.2,760],[11.0,760],[11.25,centre(5)],[END,centre(5)]];
+function S(t){if(t<=SK[0][0])return SK[0][1];for(let i=1;i<SK.length;i++){const a=SK[i-1],b=SK[i];
+  if(t<=b[0]){const p=clamp((t-a[0])/(b[0]-a[0]));const e=(b[1]<a[1])?1-Math.pow(1-p,3):eio(p);return lerp(a[1],b[1],e)}}return SK[SK.length-1][1]}
+const SPOKEN=t=>t<2.4?-1:t<7.6?3:t<11.0?4:5;
+
+/* ---------- the page (drawn twice: a dim copy below the screen, a bright copy inside it) ---------- */
+function page(parent,bright){const g=grp(parent);
+  el('rect',{x:0,y:0,width:VW,height:SEG0+NSEG*SEGH+20,style:'fill:#fff'},g);
+  el('rect',{x:0,y:0,width:VW,height:36,style:'fill:var(--blue-m)'},g);
+  const br=txt(18,25,'Magor','t-chip',g);br.style.fill='#fff';br.style.fontSize='17px';
+  el('rect',{x:110,y:9,width:300,height:18,rx:9,style:'fill:#fff'},g);
+  /* player on the left, kept in view (centred on the screen) however far the page scrolls,
+     the best case for page scrolling */
+  const pl=grp(g);
+  el('rect',{x:16,y:110,width:322,height:200,rx:12,style:'fill:var(--dark)'},pl);
+  el('circle',{cx:177,cy:210,r:24,style:'fill:#fff;opacity:.85'},pl);
+  el('rect',{x:16,y:318,width:322,height:30,rx:8,style:'fill:var(--pale)'},pl);
+  const prog=el('rect',{x:24,y:330,width:0,height:6,rx:3,style:'fill:var(--blue-m)'},pl);
+  always(t=>pl.setAttribute('transform',`translate(0 ${S(t)+(VH-238)/2-110})`));
+  always(t=>prog.setAttribute('width',clamp((t-2)/13)*300));
+  /* everything about the recording, stacked above the transcript */
+  [[300,16],[210,16]].forEach(([w,h],i)=>el('rect',{x:360,y:52+i*22,width:w,height:h,rx:5,style:'fill:var(--blue-m);opacity:.8'},g));
+  for(let i=0;i<11;i++)el('rect',{x:360,y:104+i*15,width:i==10?190:330-(i%3)*14,height:7,rx:3.5,style:'fill:var(--wire);opacity:.5'},g);
+  const lab=(x,y,s)=>{const t=txt(x,y,s,'t-cap',g);t.style.fontSize='12px'};
+  lab(360,292,'TAGS');[0,1,2,3].forEach(i=>el('rect',{x:412+i*62,y:281,width:54,height:16,rx:8,style:'fill:var(--pale)'},g));
+  lab(360,322,'TOP WORDS');for(let r=0;r<2;r++)for(let i=0;i<5;i++)el('rect',{x:448+i*50,y:311+r*22,width:44,height:16,rx:8,style:'fill:var(--pale)'},g);
+  lab(360,378,'TRANSCRIPT');el('rect',{x:462,y:366,width:238,height:20,rx:5,style:'fill:none;stroke:var(--line);stroke-width:1.5'},g);
+  lab(360,406,'FILTERS');[0,1,2].forEach(i=>el('rect',{x:440+i*86,y:396,width:12,height:12,rx:2,style:'fill:var(--blue-m)'},g));
+  const tab=(x,w,s,on)=>{el('rect',{x,y:424,width:w,height:26,rx:5,style:on?'fill:var(--blue-m)':'fill:#fff;stroke:var(--line);stroke-width:1.5'},g);
+    const t=txt(x+w/2,442,s,'t-chip',g,'middle');t.style.fontSize='14px';t.style.fill=on?'#fff':'var(--muted)'};
+  tab(360,96,'Transcript',true);tab(464,74,'Ask AI',false);tab(546,106,'Hide options',false);
+  el('rect',{x:360,y:456,width:340,height:3,style:'fill:var(--blue-m)'},g);
+  /* the transcript */
+  const hl=[];
+  for(let i=0;i<NSEG;i++){const y=SEG0+i*SEGH;
+    const h=el('rect',{x:354,y:y+2,width:352,height:SEGH-6,rx:8,style:'fill:var(--amber-bg);stroke:var(--amber);stroke-width:1.8'},g);op(h,0);hl.push(h);
+    el('rect',{x:364,y:y+10,width:40,height:18,rx:9,style:'fill:'+(i%2?'var(--navy)':'#E88BE8')},g);
+    [290,320,200].forEach((w,j)=>el('rect',{x:364,y:y+36+j*12,width:w,height:6,rx:3,style:'fill:var(--muted);opacity:.45'},g))}
+  if(bright)always(t=>{const k=SPOKEN(t);hl.forEach((h,i)=>op(h,i===k?1:0))});
+  always(t=>g.setAttribute('transform',`translate(${VX} ${VY-S(t)})`));
+  return g}
+
+/* the screen: frame, dim overflow below it, bright clipped page inside it */
+const cp=el('clipPath',{id:'vp'},defs);el('rect',{x:VX,y:VY,width:VW,height:VH,rx:14},cp);
+const cpd=el('clipPath',{id:'below'},defs);el('rect',{x:VX,y:VY+VH,width:VW,height:714-VY-VH},cpd);
+const dim=grp();op(dim,.22);dim.setAttribute('clip-path','url(#below)');page(dim,false);
+const inside=grp();inside.setAttribute('clip-path','url(#vp)');page(inside,true);
+box(VX,VY,VW,VH,'',null,14).setAttribute('style','fill:none;stroke:var(--navy);stroke-width:3');
+const fold=txt(VX+VW-12,VY+VH+30,'below the fold: the rest of the transcript','t-sub',null,'end');
+always(t=>op(fold,1-clamp((t-2.4)/.4)));
+/* scrollbar */
+const TOTAL=SEG0+NSEG*SEGH+20;
+el('rect',{x:VX+VW-12,y:VY+8,width:6,height:VH-16,rx:3,style:'fill:var(--pale)'});
+const thumb=el('rect',{x:VX+VW-12,y:VY+8,width:6,height:(VH-16)*VH/TOTAL,rx:3,style:'fill:var(--wire)'});
+always(t=>thumb.setAttribute('y',VY+8+(VH-16)*S(t)/TOTAL));
+/* where the transcript starts */
+const st=grp();box(VX+372,VY+VH-46,250,32,'chip-amber',st,16);
+const stt=txt(VX+497,VY+VH-24,'the transcript starts here','t-amb',st,'middle');stt.style.fontSize='17px';
+always(t=>op(st,t<.4?clamp(t/.4):1-clamp((t-2.4)/.3)));
+glowStep({x:VX,y:VY,w:VW,h:VH},0,'var(--amber)',14);
+
+/* ---------- what is happening, on the right ---------- */
+function lane(y,ic,cap,seq,cls){const g=grp();const r=box(800,y,380,124,'card',g,16);
+  iconDisc(ic,842,y+42,24,'var(--blue)','var(--blue-bg)',g);txt(878,y+50,cap,'t-cap',g);
+  const s=txt(822,y+96,'','t-body',g);swapText(s,seq);
+  if(cls)always(t=>{let c='t-body';for(const [a,k] of cls)if(t>=a)c=k;s.setAttribute('class',c)});
+  return {g,r}}
+const L1=lane(24,'mouse','YOU',[[0,'reading the top of the page'],[2.4,'scrolling down to read'],[5.9,'scrolling further down'],[9.4,'scrolling down again']]);
+const L2=lane(168,'circle-play','PLAYBACK',[[0,'playing'],[2.4,'speaking segment 4'],[7.6,'segment 5 starts'],[11.0,'segment 6 starts']],
+  [[0,'t-body'],[7.6,'t-amb'],[9.4,'t-body'],[11.0,'t-amb']]);
+const L3=lane(312,'move-vertical','THE PAGE',[[0,'at the top'],[2.4,'scrolled down'],[7.6,'snapped back to segment 5'],[9.4,'scrolled down'],[11.0,'snapped back again']],
+  [[0,'t-body'],[7.6,'t-prob'],[9.4,'t-body'],[11.0,'t-prob']]);
+always(t=>{const red=(t>=7.6&&t<9.4)||t>=11.0;L3.r.setAttribute('class',red?'card-red':'card')});
+/* a jolt arrow on each snap */
+[[7.6,'snap 1'],[11.0,'snap 2']].forEach(([t0,s])=>{const g=grp();icon('arrow-up',VX+VW-70,VY+200,48,'var(--red)',g);
+  const tt=txt(VX+VW-46,VY+270,s,'t-prob',g,'middle');op(g,0);
+  tw(t0,1.2,(p,t,raw)=>op(g,raw<=0||raw>=1?0:Math.sin(raw*Math.PI)),{ease:lin})});
+glowStep({x:800,y:24,w:380,h:124},1,'var(--blue-m)',16);
+glowStep({x:800,y:312,w:380,h:124},2,'var(--red)',16);
+glowStep({x:800,y:312,w:380,h:124},3,'var(--red)',16);
+
+/* the verdict */
+const ban=grp();box(800,456,380,236,'card-red',ban,18);
+icon('circle-x',820,476,30,'var(--red)',ban);
+const b1=txt(862,500,'Rejected','t-title',ban);b1.style.fill='var(--red)';
+['Page scrolling fights the','transcript’s auto-scroll.'].forEach((l,i)=>txt(822,548+i*34,l,'t-body',ban));
+['Instead: a single viewport,','only the transcript scrolls'].forEach((l,i)=>{const e=txt(822,632+i*34,l,'t-body',ban);e.style.fill='var(--blue)';e.style.fontWeight='600'});
+pop(ban,990,574,12.6,.5,0);
+
+const PH=[
+  [0,'Taller than the screen','in','Everything about the recording sits above the transcript, so the transcript starts at the bottom edge.'],
+  [2.3,'Scroll down to read','try','With page scrolling, and the player kept in view on the left, the user scrolls down to read the transcript.'],
+  [5.8,'Playback moves on','try','When the next segment starts, the transcript auto-scrolls to it, and the whole page snaps back.'],
+  [9.3,'Every new segment','try','It happens again with every new segment, pulling the page away from what the user is reading.'],
+  [12.5,'Rejected','sum','Page scrolling fights the auto-scroll, so the page must fit a single viewport, with only the transcript scrolling.']
+];
+const GRP={in:'The old page',try:'Trying page scrolling',sum:'So'};
+
+/* ---------- step player: one step at a time, earlier steps resolve instantly ---------- */
+const list=document.getElementById('steplist');
+let html='',lastG='';
+PH.forEach(([t,title,g,d],i)=>{if(g!==lastG){html+=`<li class="grp-h ${g}">${GRP[g]}</li>`;lastG=g}
+  html+=`<li><button class="step" data-i="${i}"><span class="n">${String(i+1).padStart(2,'0')}</span><span class="t">${title}</span><span class="d">${d}</span><span class="bar"></span></button></li>`});
+list.innerHTML=html;
+const stepEls=[...list.querySelectorAll('.step')];
+const countEl=document.getElementById('count');
+const endOf=i=>i<PH.length-1?PH[i+1][0]:END;
+let playing=false,stopAt=0,all=false,last=0;
+function update(){
+  stepEls.forEach((b,i)=>{
+    b.classList.toggle('on',i===cur);b.classList.toggle('done',i<cur);
+    b.setAttribute('aria-current',i===cur?'step':'false');
+    const prog=i===cur?clamp((T-PH[i][0])/(endOf(i)-PH[i][0])):i<cur?1:0;
+    b.querySelector('.bar').style.transform=`scaleX(${i===cur?prog:0})`;
+  });
+  if(countEl)countEl.textContent=`${String(Math.max(cur,0)+1).padStart(2,'0')} / ${String(PH.length).padStart(2,'0')}`;
+  const pv=document.getElementById('prev'),nx=document.getElementById('next');
+  if(pv)pv.disabled=cur<=0; if(nx)nx.disabled=cur>=PH.length-1;
+}
+function select(i){cur=clamp(i,0,PH.length-1);all=false;T=PH[cur][0];stopAt=endOf(cur);playing=true;
+  if(reduce){T=stopAt;playing=false}update()}
+function frame(now){
+  const dt=last?Math.min(.25,(now-last)/1000):0;last=now;AMB+=dt;
+  if(playing){T+=dt;
+    if(all){let k=0;PH.forEach(([t],i)=>{if(T>=t)k=i});cur=k}
+    if(T>=stopAt){T=stopAt;playing=false}
+    update()}
+  render(T);requestAnimationFrame(frame)}
+stepEls.forEach(b=>b.onclick=()=>select(+b.dataset.i));
+document.getElementById('prev').onclick=()=>select(cur-1);
+document.getElementById('next').onclick=()=>select(cur+1);
+document.getElementById('again').onclick=()=>select(Math.max(cur,0));
+document.getElementById('all').onclick=()=>{cur=0;T=0;stopAt=END;all=true;playing=true;
+  if(reduce){T=END;cur=PH.length-1;playing=false}update()};
+document.addEventListener('keydown',e=>{
+  if(e.altKey||e.ctrlKey||e.metaKey)return;
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();select(cur+1)}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();select(cur-1)}
+  else if(e.key===' '&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();select(Math.max(cur,0))}
+  else if(e.key==='Home'){e.preventDefault();select(0)}
+});
+/* hooks for the frame-by-frame recorder */
+window.__meta=()=>({steps:PH.map(p=>p[0]),end:END});
+window.__frame=(t,amb,c)=>{T=t;AMB=amb;cur=c;playing=false;update();render(T)};
+/* fit the 1920x1080 stage to any window */
+const stage=document.getElementById('stage');
+function fit(){if(RECORD)return;const s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`translate(-50%,-50%) scale(${s})`}
+addEventListener('resize',fit);fit();
+cur=0;update();render(T);
+if(!RECORD)requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>
