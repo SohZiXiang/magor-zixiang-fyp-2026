@@ -49,7 +49,21 @@ These are real examples of the corrections I gave after viewing a draft:
 - **Make it accurate.** *"It's not missing id, it's missing functions. The id was only for the example."* Every label was checked against the code.
 - **No absolute claims.** *"Don't put definitives like every, put most."* Examiners can challenge "every".
 
-## 4. How the HTML became slides
+## 4. Claude can make slides, but you make the presentation
+
+Claude can generate a whole slide deck, but what it produces is usually chunks of well-organized information: correct, neat, and grouped by topic. That is not the same as a presentation. In the end I did not use the first deck Claude generated. I used Claude for the parts it is good at (diagrams, animations, checking facts, tightening wording) and planned the flow myself.
+
+The student still has to:
+
+- **Decide the story.** What problem does the audience need to feel first, and what order makes each fix make sense? I followed the problem first, then the fix, then the result, so every solution had a reason before it appeared.
+- **Plan the flow between slides.** For example, I reordered my Ask AI section so the audience sees a summary explained, then the demo, then custom summaries, then the Q&A demo, and only then the behind-the-scenes flow. Claude organized the content; I chose the order that a listener could follow.
+- **Make the transitions sound natural when spoken.** A line can read well and still sound abrupt out loud. I rewrote several opening lines so each slide connected to the one before it.
+- **State the impact, not just the fix.** On my results slide, I asked for each improvement to answer "so what?", for example better storage efficiency or security and long-term maintainability, rather than a list of what was changed.
+- **Keep it in your own voice.** The script should sound like you, because you are the one presenting it and answering questions on it.
+
+A good way to work: write the outline and the order of slides yourself first, then ask Claude to build the figures and animations for each point.
+
+## 5. How the HTML became slides
 
 Each walkthrough is one self-contained HTML file (SVG drawing plus a small timeline engine, no internet needed). To use it in PowerPoint:
 
@@ -59,10 +73,11 @@ Each walkthrough is one self-contained HTML file (SVG drawing plus a small timel
 
 Because each step's timing is fixed, a diagram can be corrected and re-recorded without changing the clip lengths, so recorded narration still lines up.
 
-## 5. Tips for new students
+## 6. Tips for new students
 
-1. **Give context first:** report, code and the guidelines. Then ask.
-2. **One animation per idea:** a problem, a trace or a before/after, not the whole system.
-3. **Look at every draft and be specific:** "this label overlaps", "this step happens before that one", "use the real component name".
-4. **Check facts against the code:** a beautiful diagram that is wrong is worse than none.
-5. **Keep the HTML.** It is the source; the slides and videos are generated from it, so fixes stay cheap.
+1. **Plan the story yourself:** the outline and slide order are your job; Claude fills in the figures.
+2. **Give context first:** report, code and the guidelines. Then ask.
+3. **One animation per idea:** a problem, a trace or a before/after, not the whole system.
+4. **Look at every draft and be specific:** "this label overlaps", "this step happens before that one", "use the real component name".
+5. **Check facts against the code:** a beautiful diagram that is wrong is worse than none.
+6. **Keep the HTML.** It is the source; the slides and videos are generated from it, so fixes stay cheap.
