@@ -227,6 +227,7 @@ This project extends the existing MAGOR platform and focuses on the following ar
 
 ## Weekly Video Updates
 - Full Playlist: [Click to view](https://www.youtube.com/playlist?list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf)
+- Final Presentation: [Click to view](https://www.youtube.com/watch?v=iQ0LxNeolx8)
 - Week 3: [Click to view](https://www.youtube.com/watch?v=YFmng6AZweY&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=2&t=3s)
 - Week 4: [Click to view](https://www.youtube.com/watch?v=uhZ8QfyCrAs&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=1&t=2s)
 - Weeks 5-6: [Click to view](https://www.youtube.com/watch?v=Q_wS6xrqj6Y&list=PL57jZrvXqjRZAEu3gZtYnKM6Ygbu6mhMf&index=3)
